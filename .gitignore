@@ -1,4 +1,6 @@
 data
+*.h264 
+*.mp4
 *.pdf
 .vscode
 

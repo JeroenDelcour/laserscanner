@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <title>My first three.js app</title>
+    <style>
+        body {
+            margin: 0;
+        }
+    </style>
+</head>
+
+<body>
+    <script src="js/three.js"></script>
+    <script>
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.001, 1000)
+
+        const renderer = new THREE.WebGLRenderer();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.append(renderer.domElement);
+
+        const geometry = new THREE.BoxGeometry(0.1, 0.1, 0.1);
+        const material = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
+        const cube = new THREE.Mesh(geometry, material);
+        scene.add(cube);
+
+        camera.position.z = 1;
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            // cube.rotation.x += 0.01;
+            // cube.rotation.y += 0.01;
+
+            renderer.render(scene, camera);
+        }
+
+        const ws = new WebSocket("ws://localhost:5678/")
+        ws.onmessage = function(event) {
+            message = JSON.parse(event.data)
+            console.log(message)
+            camera.position.x = message.camera.position.x;
+            camera.position.y = message.camera.position.y;
+            camera.position.z = message.camera.position.z;
+            camera.rotation.x = message.camera.rotation.x;
+            camera.rotation.y = message.camera.rotation.y;
+            camera.rotation.z = message.camera.rotation.z;
+        };
+
+        animate();
+    </script>
+</body>
+
+</html>
