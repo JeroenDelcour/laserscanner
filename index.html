@@ -13,46 +13,56 @@
 
 <body>
     <script src="js/three.js"></script>
+    <script src="js/OrbitControls.js"></script>
     <script>
         const scene = new THREE.Scene();
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.001, 1000)
-        camera.up = new THREE.Vector3(0, 0, 1);
+        // camera.up = new THREE.Vector3(0, 0, 1);
 
         const renderer = new THREE.WebGLRenderer();
         renderer.setSize(window.innerWidth, window.innerHeight);
+        const controls = new THREE.OrbitControls( camera, renderer.domElement );
         document.body.append(renderer.domElement);
 
-        const geometry = new THREE.BoxGeometry(0.05, 0.05, 0.001);
-        const material = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
-        const cube = new THREE.Mesh(geometry, material);
-        scene.add(cube);
+        const markerGeometry = new THREE.BoxGeometry(0.05, 0.05, 0.001);
+        const markerMaterial = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
+        const marker = new THREE.Mesh(markerGeometry, markerMaterial);
+        scene.add(marker);
 
-        //camera.position.z = 0.3;
-        //camera.rotation.x = Math.PI;
+        camera.position.z = 1;
 
-        const axesHelper = new THREE.AxesHelper( 0.2 );
+        const axesHelper = new THREE.AxesHelper( 0.20 );
         scene.add( axesHelper );
+
+        const phoneGeometry = new THREE.ConeGeometry( 0.10, 0.10, 4 );
+        const phoneMaterial = new THREE.MeshNormalMaterial( {color: 0xffff00} );
+        const phone = new THREE.Mesh(phoneGeometry, phoneMaterial);
+        scene.add( phone );
+
+        const ws = new WebSocket("ws://localhost:5678/")
+        ws.onmessage = function(event) {
+            message = JSON.parse(event.data)
+            console.log(message)
+            phone.position.x = -message.camera.position.x;
+            phone.position.y = -message.camera.position.y;
+            phone.position.z = -message.camera.position.z;
+            phone.quaternion.setFromAxisAngle(new THREE.Vector3(message.camera.rotation.x,
+                                                                 message.camera.rotation.y,
+                                                                 message.camera.rotation.z),
+                                               message.camera.rotation.angle);
+            phone.rotateX(Math.PI);
+
+            // rotate so cone points at what the camera is looking at
+            phone.rotateX(Math.PI/2);
+            // rotate so edges align with camera image edges
+            phone.rotateY(Math.PI/4);
+        };
 
         function animate() {
             requestAnimationFrame(animate);
 
             renderer.render(scene, camera);
         }
-
-        const ws = new WebSocket("ws://localhost:5678/")
-        ws.onmessage = function(event) {
-            message = JSON.parse(event.data)
-            console.log(message)
-            camera.position.x = -message.camera.position.x;
-            camera.position.y = -message.camera.position.y;
-            camera.position.z = -message.camera.position.z;
-            camera.quaternion.setFromAxisAngle(new THREE.Vector3(message.camera.rotation.x,
-                                                                 message.camera.rotation.y,
-                                                                 message.camera.rotation.z),
-                                               message.camera.rotation.angle);
-            camera.rotateX(Math.PI);
-        };
-
         animate();
     </script>
 </body>
