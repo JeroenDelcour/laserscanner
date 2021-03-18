@@ -10,21 +10,7 @@ from pprint import pprint
 
 
 def rodrigues_rotation(v, k, theta):
-    return v*np.cos(theta) + (np.cross(k,v)*np.sin(theta)) + k*(np.dot(k,v))*(1.0-np.cos(theta))
-
-
-def rotationMatrixToEulerAngles(R):
-    sy = math.sqrt(R[0, 0] * R[0, 0] + R[1, 0] * R[1, 0])
-    singular = sy < 1e-6
-    if not singular:
-        x = math.atan2(R[2, 1], R[2, 2])
-        y = math.atan2(-R[2, 0], sy)
-        z = math.atan2(R[1, 0], R[0, 0])
-    else:
-        x = math.atan2(-R[1, 2], R[1, 1])
-        y = math.atan2(-R[2, 0], sy)
-        z = 0
-    return np.array([x, y, z])
+    return v*np.cos(theta) + (np.cross(k, v)*np.sin(theta)) + k*(np.dot(k, v))*(1.0-np.cos(theta))
 
 
 async def position(websocket, path):
@@ -54,15 +40,13 @@ async def position(websocket, path):
             cv2.waitKey(1)
             continue
         rvecs, tvecs, _objPoints = cv2.aruco.estimatePoseSingleMarkers(
-            corners, markerLength=0.100, cameraMatrix=intrinsic_matrix, distCoeffs=dist_coeffs)
+            corners, markerLength=0.05, cameraMatrix=intrinsic_matrix, distCoeffs=dist_coeffs)
         for rvec, tvec, id_ in zip(rvecs, tvecs, ids):
             if id_ == 77:
                 image = cv2.aruco.drawAxis(image, intrinsic_matrix, dist_coeffs, rvec, tvec, 0.1)
 
         cv2.imshow("", image)
         cv2.waitKey(1)
-        
-        # r_euler_angles = [rotationMatrixToEulerAngles(cv2.Rodrigues(rvec[0])[0].T) for rvec in rvecs]
 
         try:
             target_idx = list(ids).index(77)
@@ -77,18 +61,6 @@ async def position(websocket, path):
         theta = np.linalg.norm(R)
         Rnorm = R / theta  # normalized
         T = rodrigues_rotation(T, Rnorm, theta)
-
-        # rotate 180 degrees around X axis
-        # T = rodrigues_rotation(T, np.array([1, 0, 0]), -np.pi)
-
-        # alternative invert
-        # R, _ = cv2.Rodrigues(R)
-        # R = R.T
-        # R, _ = cv2.Rodrigues(R)
-        # R = R[:, 0]
-        # T = -T
-        # theta = np.linalg.norm(R)
-        # Rnorm = R / theta
 
         message = {
             "camera": {
