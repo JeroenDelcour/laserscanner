@@ -9,16 +9,31 @@ import math
 from pprint import pprint
 
 
+def detect_laser(image, lower_threshold=10):
+    gray = image[:, :, 2].astype(float) - np.mean(image[:, :, :2], axis=-1)
+    gray -= gray.min()
+    gray /= gray.max() / 255
+    gray = np.clip(gray, 0, 255)
+    gray = gray.astype(np.uint8)
+    frame_shifts = np.argmax(gray, axis=0)
+    for i in range(len(frame_shifts)):
+        y = frame_shifts[i]
+        if gray[y, i] < lower_threshold:
+            frame_shifts[i] = 0
+            continue
+    return frame_shifts
+
+
 def rodrigues_rotation(v, k, theta):
     return v*np.cos(theta) + (np.cross(k, v)*np.sin(theta)) + k*(np.dot(k, v))*(1.0-np.cos(theta))
 
 
 async def position(websocket, path):
-    # cap = cv2.VideoCapture("/home/jeroen/Downloads/VID_20210316_144205.mp4")
-    cap = cv2.VideoCapture("http://192.168.178.10:8080/video")
+    # cap = cv2.VideoCapture("test.h264")
+    cap = cv2.VideoCapture("http://raspberrypi.local:8000/stream.mjpg")
 
-    aruco_dict = cv2.aruco.Dictionary_get(cv2.aruco.DICT_6X6_100)
-    board = cv2.aruco.CharucoBoard_create(5, 7, 0.04, 0.02, aruco_dict)
+    aruco_dict = cv2.aruco.Dictionary_get(cv2.aruco.DICT_4X4_100)
+    board = cv2.aruco.CharucoBoard_create(11, 8, 0.015, 0.01125, aruco_dict)
 
     fx = fy = width = cap.get(cv2.CAP_PROP_FRAME_WIDTH)
     cx = width / 2
@@ -29,10 +44,16 @@ async def position(websocket, path):
     cv2.namedWindow("", cv2.WINDOW_NORMAL)
 
     prev_rvec, prev_tvec = None, None
+    success, image = cap.read()
+    vis = np.zeros_like(image)
     while True:
         success, image = cap.read()
         if not success:
             break
+        vis[:] = image
+
+        frame_shifts = detect_laser(image)
+        vis[frame_shifts, np.arange(image.shape[1])] = (0, 255, 0)
 
         corners, ids, rejected = cv2.aruco.detectMarkers(image, aruco_dict)
         # image = cv2.aruco.drawDetectedMarkers(image, corners, ids)
@@ -40,13 +61,13 @@ async def position(websocket, path):
             image, board, corners, ids, rejected, cameraMatrix=intrinsic_matrix, distCoeffs=dist_coeffs
         )
         if not corners:
-            cv2.imshow("", image)
+            cv2.imshow("", vis)
             cv2.waitKey(1)
             continue
         retval, corners, ids = cv2.aruco.interpolateCornersCharuco(
             corners, ids, image, board
         )
-        image = cv2.aruco.drawDetectedCornersCharuco(image, corners, ids)
+        image = cv2.aruco.drawDetectedCornersCharuco(vis, corners, ids)
 
         # rvecs, tvecs, _objPoints = cv2.aruco.estimatePoseSingleMarkers(
         #     corners, markerLength=0.05, cameraMatrix=intrinsic_matrix, distCoeffs=dist_coeffs)
@@ -57,7 +78,7 @@ async def position(websocket, path):
         success, rvec, tvec = cv2.aruco.estimatePoseCharucoBoard(
             corners, ids, board, intrinsic_matrix, dist_coeffs, rvec=prev_rvec, tvec=prev_tvec, useExtrinsicGuess=prev_tvec is not None)
 
-        cv2.imshow("", image)
+        cv2.imshow("", vis)
         cv2.waitKey(1)
 
         if not success:
