@@ -36,38 +36,31 @@
         scene.add(axesHelper);
 
         // scanner
-        const scannerGeometry = new THREE.ConeGeometry(0.10, 0.10, 4);
+        const scanner = new THREE.Group();
+        const scannerGeometry = new THREE.ConeGeometry(0.05, 0.05, 4);
         const scannerMaterial = new THREE.MeshNormalMaterial();
-        const scanner = new THREE.Mesh(scannerGeometry, scannerMaterial);
+        const scannerMesh = new THREE.Mesh(scannerGeometry, scannerMaterial);
+        scannerMesh.rotateX(Math.PI);
+        scannerMesh.rotateX(Math.PI / 2);
+        scannerMesh.rotateY(Math.PI / 4);
+
+        scanner.add(scannerMesh);
         scene.add(scanner);
 
         // scanned points
-        const MAX_POINTS = 1280;
+        const MAX_POINTS = 1640;
         const geometry = new THREE.BufferGeometry();
         const init_positions = new Float32Array(MAX_POINTS * 3); // 3 vertices per point
         geometry.setAttribute('position', new THREE.BufferAttribute(init_positions, 3));
         // const drawCount = 2; // draw the first 2 points, only
         // geometry.setDrawRange( 0, drawCount );
         const material = new THREE.PointsMaterial({ color: 0xff0000, size: 0.001 });
-
         const scannedPoints = new THREE.Points(geometry, material);
         scene.add(scannedPoints);
 
-        const positions = scannedPoints.geometry.attributes.position.array;
-        // let x, y, z, index;
-        // x = y = z = index = 0;
+        scanner.add(scannedPoints);
 
-        // for (let i = 0, l = MAX_POINTS; i < l; i++) {
-
-        //     positions[index++] = x;
-        //     positions[index++] = y;
-        //     positions[index++] = z;
-
-        //     x = (Math.random() - 0.5) * 1280 / 1280;
-        //     y = 0;
-        //     z = 0.3;
-
-        // }
+        const scannedPointsPositions = scannedPoints.geometry.attributes.position.array;
 
         const ws = new WebSocket("ws://localhost:5678/")
         ws.onmessage = function (event) {
@@ -82,11 +75,6 @@
                 message.camera.rotation.y,
                 message.camera.rotation.z),
                 message.camera.rotation.angle);
-            scanner.rotateX(Math.PI);
-            // rotate so cone points at what the camera is looking at
-            scanner.rotateX(Math.PI / 2);
-            // rotate so edges align with camera image edges
-            scanner.rotateY(Math.PI / 4);
 
             // update scanned points positions
             // for (let i = 0, l = MAX_POINTS; i < l; i++) {
@@ -99,16 +87,13 @@
 
             let x, y, z, index;
             x = y = z = index = 0;
-
             for (let i = 0, l = MAX_POINTS; i < l; i++) {
-
                 x = message.points[i][0];
                 y = message.points[i][1];
                 z = message.points[i][2];
-
-                positions[index++] = x;
-                positions[index++] = y;
-                positions[index++] = z;
+                scannedPointsPositions[index++] = x;
+                scannedPointsPositions[index++] = y;
+                scannedPointsPositions[index++] = z;
 
             }
             scannedPoints.geometry.attributes.position.needsUpdate = true; // required after the first render
