@@ -7,3 +7,4 @@
 - [pi camera still capture rate (still FPS)](https://www.raspberrypi.org/forums/viewtopic.php?f=43&t=82691)
 - [Extensive Kalman filter tutorials in Python](https://github.com/rlabbe/Kalman-and-Bayesian-Filters-in-Python)
 - [multivariate Kalman filters summary with Python](https://medium.com/@jaems33/understanding-kalman-filters-with-python-2310e87b8f48)
+- [Hardware camera sync pulses](https://www.raspberrypi.org/forums/viewtopic.php?f=43&t=190314)
