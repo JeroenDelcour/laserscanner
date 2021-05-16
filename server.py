@@ -36,8 +36,8 @@ def detect_laser(image, lower_threshold=10):
     image = image.astype(float)
     gray = image[:, :, 2] - 0.5 * (image[:, :, 0] + image[:, :, 1])
     # gray -= np.mean(image[:, :, :2], axis=-1)
-    gray -= gray.min()
-    gray /= gray.max() / 255
+    # gray -= gray.min()
+    # gray /= gray.max() / 255
     # gray = np.clip(gray, 0, 255)
     # gray = gray.astype(np.uint8)
     shifts = np.argmax(gray, axis=0)
@@ -65,6 +65,7 @@ def get_laserpoints(shifts):
     x[:] = undistorted_screen_points[:, 0] - 0.5 * len(shifts)  # in pixels
     x[:] *= PIXEL_SIZE  # pixels to meters
     x[:] = z * x / FOCAL_LENGTH
+    points[np.isnan(shifts), :] = -1
     return points
 
 
@@ -94,7 +95,7 @@ async def position(websocket, path):
         success, image = cap.read()
         if not success:
             break
-        vis = image
+        vis[:] = image
 
         shifts = detect_laser(image)
         vis[shifts, np.arange(image.shape[1])] = (0, 255, 0)
@@ -108,75 +109,72 @@ async def position(websocket, path):
         corners, ids, rejected, recovered = cv2.aruco.refineDetectedMarkers(
             image, board, corners, ids, rejected, cameraMatrix=INTRINSIC_MATRIX, distCoeffs=DIST_COEFFS
         )
-        if not corners:
-            cv2.imshow("", vis)
-            cv2.waitKey(1)
-            continue
-        retval, corners, ids = cv2.aruco.interpolateCornersCharuco(
-            corners, ids, image, board
-        )
-        vis = cv2.aruco.drawDetectedCornersCharuco(vis, corners, ids)
+        if corners:
+            retval, corners, ids = cv2.aruco.interpolateCornersCharuco(
+                corners, ids, image, board
+            )
+            vis = cv2.aruco.drawDetectedCornersCharuco(vis, corners, ids)
 
-        # rvecs, tvecs, _objPoints = cv2.aruco.estimatePoseSingleMarkers(
-        #     corners, markerLength=0.05, cameraMatrix=intrinsic_matrix, distCoeffs=dist_coeffs)
-        # for rvec, tvec, id_ in zip(rvecs, tvecs, ids):
-        #     if id_ == 77:
-        #         image = cv2.aruco.drawAxis(image, intrinsic_matrix, dist_coeffs, rvec, tvec, 0.1)
+            # rvecs, tvecs, _objPoints = cv2.aruco.estimatePoseSingleMarkers(
+            #     corners, markerLength=0.05, cameraMatrix=intrinsic_matrix, distCoeffs=dist_coeffs)
+            # for rvec, tvec, id_ in zip(rvecs, tvecs, ids):
+            #     if id_ == 77:
+            #         image = cv2.aruco.drawAxis(image, intrinsic_matrix, dist_coeffs, rvec, tvec, 0.1)
 
-        success, rvec, tvec = cv2.aruco.estimatePoseCharucoBoard(
-            corners, ids, board, INTRINSIC_MATRIX, DIST_COEFFS, rvec=prev_rvec, tvec=prev_tvec, useExtrinsicGuess=prev_tvec is not None)
+            success, rvec, tvec = cv2.aruco.estimatePoseCharucoBoard(
+                corners, ids, board, INTRINSIC_MATRIX, DIST_COEFFS, rvec=prev_rvec, tvec=prev_tvec, useExtrinsicGuess=prev_tvec is not None)
 
-        # gray = image[:, :, 2].astype(float) - np.mean(image[:, :, :2], axis=-1)
-        # gray -= gray.min()
-        # gray /= gray.max() / 255
-        # gray = np.clip(gray, 0, 255)
-        # gray = gray.astype(np.uint8)
-        # vis = np.hstack([vis, cv2.cvtColor(gray, cv2.COLOR_GRAY2BGR)])
+            # gray = image[:, :, 2].astype(float) - np.mean(image[:, :, :2], axis=-1)
+            # gray -= gray.min()
+            # gray /= gray.max() / 255
+            # gray = np.clip(gray, 0, 255)
+            # gray = gray.astype(np.uint8)
+            # vis = np.hstack([vis, cv2.cvtColor(gray, cv2.COLOR_GRAY2BGR)])
+
+            if not success:
+                prev_rvec = None
+                prev_tvec = None
+                continue
+            prev_rvec = rvec
+            prev_tvec = tvec
+
+            # try:
+            #     target_idx = list(ids).index(77)
+            # except ValueError:
+            #     continue
+
+            # T = tvecs[target_idx][0]
+            # R = rvecs[target_idx][0]
+            T = tvec[:, 0]
+            R = rvec[:, 0]
+
+            # invert
+            R = -R
+            theta = np.linalg.norm(R)
+            Rnorm = R / theta  # normalized
+            T = rodrigues_rotation(T, Rnorm, theta)
+
+            message = {
+                "camera": {
+                    "position": {
+                        "x": T[0],
+                        "y": T[1],
+                        "z": T[2],
+                    },
+                    "rotation": {
+                        "x": Rnorm[0],
+                        "y": Rnorm[1],
+                        "z": Rnorm[2],
+                        "angle": theta,
+                    }
+                },
+                "points": points.tolist()
+            }
+
+            await websocket.send(json.dumps(message))
 
         cv2.imshow("", vis)
         cv2.waitKey(1)
-
-        if not success:
-            prev_rvec = None
-            prev_tvec = None
-            continue
-        prev_rvec = rvec
-        prev_tvec = tvec
-
-        # try:
-        #     target_idx = list(ids).index(77)
-        # except ValueError:
-        #     continue
-
-        # T = tvecs[target_idx][0]
-        # R = rvecs[target_idx][0]
-        T = tvec[:, 0]
-        R = rvec[:, 0]
-
-        # invert
-        R = -R
-        theta = np.linalg.norm(R)
-        Rnorm = R / theta  # normalized
-        T = rodrigues_rotation(T, Rnorm, theta)
-
-        message = {
-            "camera": {
-                "position": {
-                    "x": T[0],
-                    "y": T[1],
-                    "z": T[2],
-                },
-                "rotation": {
-                    "x": Rnorm[0],
-                    "y": Rnorm[1],
-                    "z": Rnorm[2],
-                    "angle": theta,
-                }
-            },
-            "points": points.tolist()
-        }
-
-        await websocket.send(json.dumps(message))
 
         await asyncio.sleep(1/30)
 
