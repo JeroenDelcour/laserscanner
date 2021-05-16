@@ -9,19 +9,48 @@ import math
 from pprint import pprint
 
 
+points = np.zeros(shape=(1280, 3))
+_points_arange = np.arange(len(points))
+angle = np.deg2rad(70)
+baseline = 118.478e-3  # meters
+focal_length = 3.04e-3  # meters
+
+
 def detect_laser(image, lower_threshold=10):
-    gray = image[:, :, 2].astype(float) - np.mean(image[:, :, :2], axis=-1)
+    image = image.astype(float)
+    gray = image[:, :, 2] - 0.5 * (image[:, :, 0] + image[:, :, 1])
+    # gray -= np.mean(image[:, :, :2], axis=-1)
     gray -= gray.min()
     gray /= gray.max() / 255
-    gray = np.clip(gray, 0, 255)
-    gray = gray.astype(np.uint8)
-    frame_shifts = np.argmax(gray, axis=0)
-    for i in range(len(frame_shifts)):
-        y = frame_shifts[i]
-        if gray[y, i] < lower_threshold:
-            frame_shifts[i] = 0
-            continue
-    return frame_shifts
+    # gray = np.clip(gray, 0, 255)
+    # gray = gray.astype(np.uint8)
+    shifts = np.argmax(gray, axis=0)
+    # print(shifts)
+    # print(shifts.shape)
+    # print(gray[shifts, _points_arange].shape)
+    # 1/0
+    shifts[gray[shifts, _points_arange] < lower_threshold] = -1
+    # for i in range(len(shifts)):
+    #     y = shifts[i]
+    #     if gray[y, i] < lower_threshold:
+    #         shifts[i] = -1
+    return shifts
+
+
+def get_depth(shifts):
+    shifts = shifts.astype(float)
+    shifts[shifts < 0] = np.nan
+    # shifts[shifts == 0] = np.nan
+    shifts -= 0.5*720  # measure from optical center
+    shifts *= -1  # flip
+    shifts *= 0.000001121951  # pixels to meters
+    z = points[:, 2] = (baseline * focal_length * np.tan(angle)) / (focal_length - shifts * np.tan(angle))
+    y = points[:, 1] = z * shifts / focal_length  # similar triangles
+    x = points[:, 0]
+    x[:] = _points_arange - 0.5 * len(shifts)  # in pixels
+    x[:] *= 0.000001121951  # pixels to meters
+    x[:] = z * x / focal_length
+    return points
 
 
 def rodrigues_rotation(v, k, theta):
@@ -52,8 +81,12 @@ async def position(websocket, path):
             break
         vis[:] = image
 
-        frame_shifts = detect_laser(image)
-        vis[frame_shifts, np.arange(image.shape[1])] = (0, 255, 0)
+        shifts = detect_laser(image)
+        vis[shifts, np.arange(image.shape[1])] = (0, 255, 0)
+        points = get_depth(shifts)
+        # points = np.zeros(shape=(len(shifts), 3))
+        # points[:, 0] = np.arange(len(shifts))  # x
+        # points[:, 2] = 0.3  # z (depth)
 
         corners, ids, rejected = cv2.aruco.detectMarkers(image, aruco_dict)
         # image = cv2.aruco.drawDetectedMarkers(image, corners, ids)
@@ -117,7 +150,8 @@ async def position(websocket, path):
                     "z": Rnorm[2],
                     "angle": theta,
                 }
-            }
+            },
+            "points": points.tolist()
         }
 
         await websocket.send(json.dumps(message))

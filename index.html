@@ -21,41 +21,97 @@
 
         const renderer = new THREE.WebGLRenderer();
         renderer.setSize(window.innerWidth, window.innerHeight);
-        const controls = new THREE.OrbitControls( camera, renderer.domElement );
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
         document.body.append(renderer.domElement);
 
+        camera.position.z = 1.5;
+
+        // ChArUco board marker
         const markerGeometry = new THREE.BoxGeometry(0.05, 0.05, 0.001);
         const markerMaterial = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
         const marker = new THREE.Mesh(markerGeometry, markerMaterial);
         scene.add(marker);
 
-        camera.position.z = 1.5;
+        const axesHelper = new THREE.AxesHelper(0.20);
+        scene.add(axesHelper);
 
-        const axesHelper = new THREE.AxesHelper( 0.20 );
-        scene.add( axesHelper );
+        // scanner
+        const scannerGeometry = new THREE.ConeGeometry(0.10, 0.10, 4);
+        const scannerMaterial = new THREE.MeshNormalMaterial();
+        const scanner = new THREE.Mesh(scannerGeometry, scannerMaterial);
+        scene.add(scanner);
 
-        const phoneGeometry = new THREE.ConeGeometry( 0.10, 0.10, 4 );
-        const phoneMaterial = new THREE.MeshNormalMaterial( {color: 0xffff00} );
-        const phone = new THREE.Mesh(phoneGeometry, phoneMaterial);
-        scene.add( phone );
+        // scanned points
+        const MAX_POINTS = 1280;
+        const geometry = new THREE.BufferGeometry();
+        const init_positions = new Float32Array(MAX_POINTS * 3); // 3 vertices per point
+        geometry.setAttribute('position', new THREE.BufferAttribute(init_positions, 3));
+        // const drawCount = 2; // draw the first 2 points, only
+        // geometry.setDrawRange( 0, drawCount );
+        const material = new THREE.PointsMaterial({ color: 0xff0000, size: 0.001 });
+
+        const scannedPoints = new THREE.Points(geometry, material);
+        scene.add(scannedPoints);
+
+        const positions = scannedPoints.geometry.attributes.position.array;
+        // let x, y, z, index;
+        // x = y = z = index = 0;
+
+        // for (let i = 0, l = MAX_POINTS; i < l; i++) {
+
+        //     positions[index++] = x;
+        //     positions[index++] = y;
+        //     positions[index++] = z;
+
+        //     x = (Math.random() - 0.5) * 1280 / 1280;
+        //     y = 0;
+        //     z = 0.3;
+
+        // }
 
         const ws = new WebSocket("ws://localhost:5678/")
-        ws.onmessage = function(event) {
+        ws.onmessage = function (event) {
             message = JSON.parse(event.data)
             console.log(message)
-            phone.position.x = -message.camera.position.x;
-            phone.position.y = -message.camera.position.y;
-            phone.position.z = -message.camera.position.z;
-            phone.quaternion.setFromAxisAngle(new THREE.Vector3(message.camera.rotation.x,
-                                                                 message.camera.rotation.y,
-                                                                 message.camera.rotation.z),
-                                               message.camera.rotation.angle);
-            phone.rotateX(Math.PI);
 
+            // update scanner position
+            scanner.position.x = -message.camera.position.x;
+            scanner.position.y = -message.camera.position.y;
+            scanner.position.z = -message.camera.position.z;
+            scanner.quaternion.setFromAxisAngle(new THREE.Vector3(message.camera.rotation.x,
+                message.camera.rotation.y,
+                message.camera.rotation.z),
+                message.camera.rotation.angle);
+            scanner.rotateX(Math.PI);
             // rotate so cone points at what the camera is looking at
-            phone.rotateX(Math.PI/2);
+            scanner.rotateX(Math.PI / 2);
             // rotate so edges align with camera image edges
-            phone.rotateY(Math.PI/4);
+            scanner.rotateY(Math.PI / 4);
+
+            // update scanned points positions
+            // for (let i = 0, l = MAX_POINTS; i < l; i++) {
+            //     scannedPoints.geometry.attributes.position.array[i][0] = message.points[i][0] / 1280;
+            //     scannedPoints.geometry.attributes.position.array[i][1] = message.points[i][1];
+            //     scannedPoints.geometry.attributes.position.array[i][2] = message.points[i][2];
+            // }
+            // console.log(positions);
+            // scannedPoints.geometry.attributes.position.array = message.points;
+
+            let x, y, z, index;
+            x = y = z = index = 0;
+
+            for (let i = 0, l = MAX_POINTS; i < l; i++) {
+
+                x = message.points[i][0];
+                y = message.points[i][1];
+                z = message.points[i][2];
+
+                positions[index++] = x;
+                positions[index++] = y;
+                positions[index++] = z;
+
+            }
+            scannedPoints.geometry.attributes.position.needsUpdate = true; // required after the first render
         };
 
         function animate() {
