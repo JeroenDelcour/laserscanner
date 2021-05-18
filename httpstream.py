@@ -5,6 +5,7 @@ import socketserver
 from threading import Condition
 from http import server
 import gpiozero
+from time import sleep
 
 PAGE="""\
 <html>
@@ -13,18 +14,25 @@ PAGE="""\
 </head>
 <body>
 <h1>PiCamera MJPEG Streaming Demo</h1>
-<img src="stream.mjpg" width="640" height="480" />
+<img src="stream.mjpg" width="1640" height="1232" />
 </body>
 </html>
 """
 
 class StreamingOutput(object):
-    def __init__(self):
+    def __init__(self, camera):
+        self.camera = camera
         self.frame = None
         self.buffer = io.BytesIO()
         self.condition = Condition()
+        # self._longshutter = True
 
     def write(self, buf):
+        # if self._longshutter:
+        #     self.camera.shutter_speed = 1000
+        # else:
+        #     self.camera.shutter_speed = 20
+        # self._longshutter = not self._longshutter
         if buf.startswith(b'\xff\xd8'):
             # New frame, copy the existing buffer's content and notify all
             # clients it's available
@@ -81,8 +89,12 @@ class StreamingServer(socketserver.ThreadingMixIn, server.HTTPServer):
 laser = gpiozero.LED(17)
 laser.on()
 
-with picamera.PiCamera(resolution='1280x720', framerate=30) as camera:
-    output = StreamingOutput()
+with picamera.PiCamera(resolution='1640x1232', framerate=15) as camera:
+    camera.shutter_speed = 200
+    camera.iso = 800
+    # sleep(2)  # let automatic gain settle
+    # camera.exposure_mode = "off"
+    output = StreamingOutput(camera)
     camera.start_recording(output, format='mjpeg')
     try:
         address = ('', 8000)
