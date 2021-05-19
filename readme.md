@@ -11,4 +11,3 @@
 - [Occupancy grid mapping from lidar data](https://www.coursera.org/lecture/motion-planning-self-driving-cars/lesson-2-populating-occupancy-grids-from-lidar-scan-data-part-2-VcH67)
 - [Faster ArUco marker detection](http://andrewd.ces.clemson.edu/courses/cpsc482/papers/RMM18_speededAruco.pdf)
 - [3D occupancy grid Python implementation](https://github.com/balzer82/3D-OccupancyGrid-Python)
-- [Raspberry Pi webcam firmware](https://github.com/showmewebcam/showmewebcam)
