@@ -124,7 +124,7 @@ async def position(websocket, path):
         vis[:] = image
 
         sample = image[:, HORIZONTAL_RESOLUTION//2].mean()
-        if sample < 10:
+        if sample < 20:
             shifts = detect_laser(image)
             vis[shifts, np.arange(image.shape[1])] = (0, 255, 0)
             points = get_laserpoints(shifts)
