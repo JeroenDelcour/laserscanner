@@ -18,6 +18,7 @@ async def scan(websocket, path):
         success, image = cap.read()
         if not success:
             break
+        image = cv2.rotate(image, cv2.ROTATE_90_CLOCKWISE)
         images[images_idx] = image
         image_exposures[images_idx] = "long" if image[:,
                                                       laserscanner.horizontal_resolution // 2].mean() > 20 else "short"

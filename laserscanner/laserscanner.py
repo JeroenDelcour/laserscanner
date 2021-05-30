@@ -15,8 +15,8 @@ class LaserScanner:
         self.laser_angle = np.deg2rad(75)
         self.baseline = 118.478e-3  # meters
         self.focal_length = 3.04e-3  # meters
-        self.vertical_resolution = 1232
-        self.horizontal_resolution = 1640
+        self.vertical_resolution = 1640
+        self.horizontal_resolution = 1232
         self.pixel_size = 3.68e-3 / self.horizontal_resolution
         fx = fy = 1355
         cx, cy = 0.5 * self.horizontal_resolution, 0.5 * self.vertical_resolution
@@ -82,7 +82,7 @@ class LaserScanner:
             self._screen_points[np.newaxis, :], self.camera_matrix, self.distortion_coefficients, P=self.camera_matrix).squeeze()
         shifts[:] = undistorted_screenpoints[:, 1]
         shifts -= 0.5 * self.vertical_resolution  # measure from optical center
-        shifts *= -1  # flip
+        # shifts *= -1  # flip
         shifts *= self.pixel_size  # pixels to meters
         z = self.points[:, 2] = (self.baseline * self.focal_length * np.tan(self.laser_angle)
                                  ) / (self.focal_length - shifts * np.tan(self.laser_angle))
