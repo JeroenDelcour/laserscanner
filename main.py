@@ -18,6 +18,8 @@ async def scan(websocket, path):
 
     cv2.namedWindow("", cv2.WINDOW_NORMAL)
 
+    first_intersections = None
+
     while True:
         success, image = cap.read()
         if not success:
@@ -54,35 +56,6 @@ async def scan(websocket, path):
             # image frame to camera frame
             camera_points[:2] = ((laser_screenpoints - np.array([cx, cy])) / np.array([fx, fy])).T
             camera_points[2, :] = 1.0
-            # camera_points = points.T
-            # points = points.T
-            # print(points[:, int(cx)])
-
-            # image frame to camera frame
-            # camera_points = np.linalg.inv(laserscanner.camera_matrix) @ points
-            # camera_points = np.ones(shape=(3, len(laser_screenpoints)), dtype=np.float32)
-            # camera_points[:2, :] = ((laser_screenpoints - np.array([cx, cy])) / np.array([fx, fy])).T
-            # camera_points = camera_points2
-            # print(camera_points[:, int(cx)])
-
-            # # camera frame to world frame
-
-            # rot_matrix, _ = cv2.Rodrigues(rvec)
-            # # transform = np.hstack([rot_matrix, tvec])
-            # # print(transform)
-            # po, l = MAX_POINTSints = rot_matrix.T @ points - rot_matrix.T @ tvec
-            # T = rot_matrix.T @ tvec
-            # Tx, Ty, Tz = T.squeeze()
-            # print(points.shape)
-            # dx, dy, dz = points
-            # X = (-Tz / dz) * dx + Tx
-            # Y = (-Tz / dz) * dy + Ty
-            # print(X[int(cx)], Y[int(cx)])
-            # points = points.T
-            # print(points[:, int(cx)])
-
-            # points *= laserscanner.pixel_size
-            # print(points[500])
 
             # define calibration plane in camera frame
             rot_matrix, _ = cv2.Rodrigues(rvec)
@@ -106,8 +79,24 @@ async def scan(websocket, path):
 
             # intersect rays with calibration plane
             s = -d / (a*camera_points[0] + b*camera_points[1] + c)  # scale factor
-            world_points = s * camera_points
-            print(world_points[:, int(cx)])
+            intersections = s * camera_points
+            print(intersections[:, int(cx)])
+
+            if first_intersections is None:
+                first_intersections = intersections.copy()
+            elif abs(first_intersections[2, :].mean() - intersections[2, :].mean()) > 0.10:
+                print("Got second set of intersections")
+
+                # fit laser plane
+                A = np.hstack([first_intersections, intersections]).T
+                B = A[:, 2].copy().T
+                A[:, 2] = 1.0
+                fit = np.linalg.inv(A.T @ A) @ A.T @ B
+                print(fit)
+                errors = B - A @ fit
+                print("Errors: ", errors)
+                residuals = np.linalg.norm(errors)
+                print("Residuals: ", residuals)
 
             # print()
 
@@ -145,7 +134,7 @@ async def scan(websocket, path):
                         "angle": float(theta),
                     }
                 },
-                "points": laserscanner.points.tolist(),
+                "points": intersections.T.tolist(),
                 "debugPoints": points_c.tolist()
             }
             await websocket.send(json.dumps(message))
