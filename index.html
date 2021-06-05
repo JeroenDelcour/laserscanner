@@ -57,10 +57,18 @@
         const material = new THREE.PointsMaterial({ color: 0xff0000, size: 0.001 });
         const scannedPoints = new THREE.Points(geometry, material);
         scene.add(scannedPoints);
-
+        const scannedPointsPositions = scannedPoints.geometry.attributes.position.array;
         scanner.add(scannedPoints);
 
-        const scannedPointsPositions = scannedPoints.geometry.attributes.position.array;
+        // debug points
+        const debugGeometry = new THREE.BufferGeometry();
+        var max_points = 3;
+        debugGeometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(max_points * 3), 3));
+        const debugMaterial = new THREE.PointsMaterial({ color: 0x0000ff, size: 0.01});
+        const debugPoints = new THREE.Points(debugGeometry, debugMaterial);
+        scene.add(debugPoints);
+        const debugPointsPositions = debugPoints.geometry.attributes.position.array;
+        scanner.add(debugPoints);
 
         const ws = new WebSocket("ws://localhost:5678/")
         ws.onmessage = function (event) {
@@ -97,6 +105,19 @@
 
             }
             scannedPoints.geometry.attributes.position.needsUpdate = true; // required after the first render
+
+            // update debug points
+            x = y = z = index = 0;
+            for (let i = 0; i < 3; i++) {
+                x = message.debugPoints[i][0];
+                y = message.debugPoints[i][1];
+                z = message.debugPoints[i][2];
+                debugPointsPositions[index++] = x;
+                debugPointsPositions[index++] = y;
+                debugPointsPositions[index++] = z;
+
+            }
+            debugPoints.geometry.attributes.position.needsUpdate = true; // required after the first render
         };
 
         function animate() {

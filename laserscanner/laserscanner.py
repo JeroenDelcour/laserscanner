@@ -23,9 +23,14 @@ class LaserScanner:
         self.camera_matrix = np.array([[fx, 0, cx], [0, fy, cy], [0, 0, 1]], dtype=np.float32)
         self.distortion_coefficients = np.array([0.22128342058032355,
                                                  -0.5663376863990286,
-                                                 -0.0001804474513748153,
                                                  -0.001201953225667692,
+                                                 -0.0001804474513748153,
                                                  0.2602535953452802], dtype=np.float32)
+        # self.distortion_coefficients = np.array([0,
+        #                                          0,
+        #                                          0,
+        #                                          0,
+        #                                          0], dtype=np.float32)
         self.position_lock = False
         self.laser_plane = np.zeros(4)
 
