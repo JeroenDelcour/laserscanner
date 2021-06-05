@@ -27,6 +27,7 @@ class LaserScanner:
                                                  -0.001201953225667692,
                                                  0.2602535953452802], dtype=np.float32)
         self.position_lock = False
+        self.laser_plane = np.zeros(4)
 
         # pre-allocate memory
         self.points = np.zeros(shape=(self.horizontal_resolution, 3))
@@ -70,26 +71,44 @@ class LaserScanner:
         gray = image[:, :, 2]
         shifts = np.argmax(gray, axis=0)
         # filter out too dark segments
-        shifts[gray[shifts, self._points_arange] < lower_threshold] = -1
-        return shifts
-
-    def scan(self, image):
-        """ Scan laser in image and return 3D points relative to camera. """
-        shifts = self.find_laser(image).astype(np.float32)
-        shifts[shifts == -1] = np.nan
+        too_dark = gray[shifts, self._points_arange] < lower_threshold
+        shifts = shifts.astype(float)
+        shifts[too_dark] = np.nan
         self._screen_points[:, 1] = shifts
         undistorted_screenpoints = cv2.undistortPoints(
             self._screen_points[np.newaxis, :], self.camera_matrix, self.distortion_coefficients, P=self.camera_matrix).squeeze()
-        shifts[:] = undistorted_screenpoints[:, 1]
-        shifts -= 0.5 * self.vertical_resolution  # measure from optical center
+        return undistorted_screenpoints
+
+    def scan(self, image):
+        """ Scan laser in image and return 3D points relative to camera. """
+        screenpoints = self.find_laser(image)
+        # shifts[:] = undistorted_screenpoints[:, 1]
+        # shifts -= 0.5 * self.vertical_resolution  # measure from optical center
         # shifts *= -1  # flip
-        shifts *= self.pixel_size  # pixels to meters
-        z = self.points[:, 2] = (self.baseline * self.focal_length * np.tan(self.laser_angle)
-                                 ) / (self.focal_length - shifts * np.tan(self.laser_angle))
-        y = self.points[:, 1] = z * shifts / self.focal_length  # similar triangles
-        x = self.points[:, 0]
-        x[:] = undistorted_screenpoints[:, 0] - 0.5 * len(shifts)  # in pixels
-        x[:] *= self.pixel_size  # pixels to meters
-        x[:] = z * x / self.focal_length
-        self.points[np.isnan(shifts), :] = -1
-        return self.points
+        # shifts *= self.pixel_size  # pixels to meters
+        # z = self.points[:, 2] = (self.baseline * self.focal_length * np.tan(self.laser_angle)
+        #                          ) / (self.focal_length - shifts * np.tan(self.laser_angle))
+        # y = self.points[:, 1] = z * shifts / self.focal_length  # similar triangles
+        # x = self.points[:, 0]
+        # x[:] = undistorted_screenpoints[:, 0] - 0.5 * len(shifts)  # in pixels
+        # x[:] *= self.pixel_size  # pixels to meters
+        # x[:] = z * x / self.focal_length
+        # self.points[np.isnan(shifts), :] = -1
+        # return self.points
+
+        Cx = 0.5 * self.horizontal_resolution
+        Cy = 0.5 * self.vertical_resolution
+        fx = fy = self.focal_length
+        A, B, C, D = self.laser_plane
+
+        u, v = screenpoints.T
+        x = (u - Cx) / fx
+        y = (v - Cy) / fy
+        z = -D / (A * x + B * y + C)
+        x = x * z
+        y = y * z
+
+        x *= self.pixel_size
+        y *= self.pixel_size
+        z *= self.pixel_size
+        return np.array([x, y, z]).T
