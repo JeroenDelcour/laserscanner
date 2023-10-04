@@ -1,0 +1,4 @@
+numpy==1.26.0
+opencv-contrib-python==4.8.1.78
+ujson==5.8.0
+websockets==11.0.3

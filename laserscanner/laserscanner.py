@@ -9,13 +9,15 @@ def rodrigues_rotation(v, k, theta):
 
 class LaserScanner:
     def __init__(self):
-        self.aruco_dict = cv2.aruco.Dictionary_get(cv2.aruco.DICT_4X4_100)
-        self.charuco_board = cv2.aruco.CharucoBoard_create(11, 8, 0.015, 0.01125, self.aruco_dict)
+        self.aruco_dict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_100)
+        self.charuco_board = cv2.aruco.CharucoBoard(
+            size=(11, 8), squareLength=0.015, markerLength=0.011, dictionary=self.aruco_dict
+        )
 
         self.laser_angle = np.deg2rad(75)
         self.baseline = 118.478e-3  # meters
         self.focal_length = 3.04e-3  # meters
-        self.vertical_resolution = 1640
+        self.vertical_resolution = 1632
         self.horizontal_resolution = 1232
         self.pixel_size = 3.68e-3 / self.horizontal_resolution
         fx = fy = 1355
@@ -45,12 +47,14 @@ class LaserScanner:
         corners, ids, rejected = cv2.aruco.detectMarkers(cv2.resize(
             image, dsize=None, fx=resize, fy=resize), self.aruco_dict)
         corners = [c / resize for c in corners]
-        corners, ids, rejected, recovered = cv2.aruco.refineDetectedMarkers(
-            image, self.charuco_board, corners, ids, rejected, cameraMatrix=self.camera_matrix, distCoeffs=self.distortion_coefficients)
+        # corners, ids, rejected, recovered = cv2.aruco.refineDetectedMarkers(
+        #     image, self.charuco_board, corners, ids, rejected, cameraMatrix=self.camera_matrix, distCoeffs=self.distortion_coefficients)
         if not corners:
             self.position_lock = False
             return False
         retval, corners, ids = cv2.aruco.interpolateCornersCharuco(corners, ids, image, self.charuco_board)
+        vis = cv2.aruco.drawDetectedCornersCharuco(image=image, charucoCorners=corners, charucoIds=ids)
+        cv2.imshow("stream", vis)
         success, _, _ = cv2.aruco.estimatePoseCharucoBoard(
             corners, ids, self.charuco_board, self.camera_matrix, self.distortion_coefficients, rvec=self._rvec, tvec=self._tvec, useExtrinsicGuess=self.position_lock)
         if not success:

@@ -14,6 +14,7 @@ async def scan(websocket, path):
                              laserscanner.horizontal_resolution, 3), dtype=np.uint8)
     image_exposures = ["", "", ""]
     images_idx = 0
+    cv2.namedWindow("stream", cv2.WINDOW_NORMAL)
     while True:
         success, image = cap.read()
         if not success:
@@ -24,33 +25,35 @@ async def scan(websocket, path):
                                                       laserscanner.horizontal_resolution // 2].mean() > 20 else "short"
         images_idx = (images_idx + 1) % len(images)
 
-        if image_exposures == ["long", "short", "long"]:
-            laserscanner.update_pose(images[0])
-            T0, R0, theta0 = laserscanner.T, laserscanner.R, laserscanner.theta
-            points = laserscanner.scan(images[1])
-            laserscanner.update_pose(images[2])
-            T1, R1, theta1 = laserscanner.T, laserscanner.R, laserscanner.theta
-            T = (T0 + T1) / 2
-            R = (R0 + R1) / 2
-            theta = (theta0 + theta1) / 2
+        # if image_exposures == ["long", "short", "long"]:
+        laserscanner.update_pose(images[0])
+        T0, R0, theta0 = laserscanner.T, laserscanner.R, laserscanner.theta
+        points = laserscanner.scan(images[1])
+        laserscanner.update_pose(images[2])
+        T1, R1, theta1 = laserscanner.T, laserscanner.R, laserscanner.theta
+        T = (T0 + T1) / 2
+        R = (R0 + R1) / 2
+        theta = (theta0 + theta1) / 2
 
-            message = {
-                "camera": {
-                    "position": {
-                        "x": float(T[0]),
-                        "y": float(T[1]),
-                        "z": float(T[2]),
-                    },
-                    "rotation": {
-                        "x": float(R[0]),
-                        "y": float(R[1]),
-                        "z": float(R[2]),
-                        "angle": theta,
-                    }
+        message = {
+            "camera": {
+                "position": {
+                    "x": float(T[0]),
+                    "y": float(T[1]),
+                    "z": float(T[2]),
                 },
-                "points": points.tolist()
-            }
-            await websocket.send(json.dumps(message))
+                "rotation": {
+                    "x": float(R[0]),
+                    "y": float(R[1]),
+                    "z": float(R[2]),
+                    "angle": theta,
+                }
+            },
+            "points": points.tolist()
+        }
+        await websocket.send(json.dumps(message))
+
+        cv2.waitKey(1)
 
 
 async def main():
