@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>My first three.js app</title>
+    <style>
+      body {
+        margin: 0;
+      }
+    </style>
+  </head>
+
+  <body>
+    <script src="js/three.js"></script>
+    <script src="js/OrbitControls.js"></script>
+    <script>
+      const scene = new THREE.Scene();
+      const camera = new THREE.PerspectiveCamera(
+        75,
+        window.innerWidth / window.innerHeight,
+        0.001,
+        1000
+      );
+
+      const renderer = new THREE.WebGLRenderer();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      const controls = new THREE.OrbitControls(camera, renderer.domElement);
+      document.body.append(renderer.domElement);
+
+      camera.position.z = 1.5;
+
+      const axesHelper = new THREE.AxesHelper(0.2);
+      scene.add(axesHelper);
+
+      // scanner
+      const scanner = new THREE.Group();
+      const scannerGeometry = new THREE.ConeGeometry(0.05, 0.05, 4);
+      const scannerMaterial = new THREE.MeshNormalMaterial();
+      const scannerMesh = new THREE.Mesh(scannerGeometry, scannerMaterial);
+      scannerMesh.rotateX(Math.PI);
+      scannerMesh.rotateX(Math.PI / 2);
+      scannerMesh.rotateY(Math.PI / 4);
+
+      scanner.add(scannerMesh);
+      scene.add(scanner);
+
+      const ws = new WebSocket("ws://192.168.2.17:8765/");
+      ws.onmessage = function (event) {
+        message = JSON.parse(event.data);
+        console.log(message);
+
+        quaternion = new THREE.Quaternion(
+          message.quaternion.x,
+          message.quaternion.y,
+          message.quaternion.z,
+          message.quaternion.w
+        );
+        scanner.setRotationFromQuaternion(quaternion);
+      };
+
+      function animate() {
+        requestAnimationFrame(animate);
+
+        renderer.render(scene, camera);
+      }
+      animate();
+    </script>
+  </body>
+</html>

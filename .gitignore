@@ -2,6 +2,7 @@ data
 *.h264 
 *.mp4
 *.pdf
+*.png
 .vscode
 
 # Byte-compiled / optimized / DLL files
