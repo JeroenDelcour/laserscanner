@@ -2,52 +2,76 @@ import asyncio
 import json
 import math
 import websockets
-import time
+from pprint import pprint
 
-from mpu6050 import mpu6050
-from pyquaternion import Quaternion
+from MPU6050 import MPU6050
+from MPU6050.Quaternion import Quaternion
 
-sensor = mpu6050(0x68)
+i2c_bus = 1
+device_address = 0x68
+# The offsets are different for each device and should be changed
+# accordingly using a calibration procedure
+x_accel_offset = -1874
+y_accel_offset = 255
+z_accel_offset = 1046
+x_gyro_offset = 46
+y_gyro_offset = 26
+z_gyro_offset = -27
+mpu = MPU6050(
+    i2c_bus,
+    device_address,
+    x_accel_offset,
+    y_accel_offset,
+    z_accel_offset,
+    x_gyro_offset,
+    y_gyro_offset,
+    z_gyro_offset,
+    0,
+)
 
-state = {
-            "quaternion": Quaternion()
-        }
+mpu.dmp_initialize()
+mpu.set_DMP_enabled(True)
+packet_size = mpu.DMP_get_FIFO_packet_size()
+FIFO_buffer = [0] * 64
+FIFO_count_list = list()
+
 
 async def sense(websocket):
-    t_prev = time.time()
+    quat = Quaternion()
     while True:
-        gyro_data = sensor.get_gyro_data()
+        FIFO_count = mpu.get_FIFO_count()
+        mpu_int_status = mpu.get_int_status()
 
-        now = time.time()
-        dt = now - t_prev
-        t_prev = now
+        # If overflow is detected by status or fifo count we want to reset
+        if (FIFO_count == 1024) or (mpu_int_status & 0x10):
+            mpu.reset_FIFO()
+            # print("overflow!")
+        # Check if fifo data is ready
+        elif mpu_int_status & 0x02:
+            # Wait until packet_size number of bytes are ready for reading, default
+            # is 42 bytes
+            while FIFO_count < packet_size:
+                FIFO_count = mpu.get_FIFO_count()
+            FIFO_buffer = mpu.get_FIFO_bytes(packet_size)
+            quat = mpu.DMP_get_quaternion(FIFO_buffer)
 
-        gyro_data = {k: math.radians(v) for k, v in gyro_data.items()}
-        angle = math.sqrt(gyro_data["x"] ** 2 + gyro_data["y"] ** 2 + gyro_data["z"] ** 2) * dt
+            message = {
+                "quaternion": {
+                    "x": quat.y,  # switch x, y, z values around so that Y is up
+                    "y": quat.z,
+                    "z": quat.x,
+                    "w": quat.w,
+                },
+            }
+            pprint(message)
 
-        if angle != 0:
-            gyro_data["x"] /= angle
-            gyro_data["y"] /= angle
-            gyro_data["z"] /= angle
+            await websocket.send(json.dumps(message))
 
-        dq = Quaternion(axis=[gyro_data["x"], gyro_data["y"], gyro_data["z"]], angle=angle)
-        state["quaternion"] = dq * state["quaternion"]
-
-        print(state["quaternion"])
-
-        message = {"quaternion":
-                    {
-                        "x": state["quaternion"][1],
-                        "y": state["quaternion"][2],
-                        "z": state["quaternion"][3],
-                        "w": state["quaternion"][0],
-                    }
-                }
-
-        await websocket.send(json.dumps(message))
 
 async def main():
     async with websockets.serve(sense, host=None, port=8765):
+        print("Server is started")
         await asyncio.Future()
+
 
 asyncio.run(main())
