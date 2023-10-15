@@ -1,6 +1,5 @@
 import asyncio
 import json
-import math
 import websockets
 from pprint import pprint
 
@@ -32,40 +31,36 @@ mpu = MPU6050(
 mpu.dmp_initialize()
 mpu.set_DMP_enabled(True)
 packet_size = mpu.DMP_get_FIFO_packet_size()
-FIFO_buffer = [0] * 64
-FIFO_count_list = list()
 
 
 async def sense(websocket):
     quat = Quaternion()
     while True:
+        # Clear the buffer so as we can get fresh values
+        # The sensor is running a lot faster than our sample period
+        mpu.reset_FIFO()
+
+        # wait for correct available data length, should be a VERY short wait
         FIFO_count = mpu.get_FIFO_count()
-        mpu_int_status = mpu.get_int_status()
+        while FIFO_count < packet_size:
+            FIFO_count = mpu.get_FIFO_count()
 
-        # If overflow is detected by status or fifo count we want to reset
-        if (FIFO_count == 1024) or (mpu_int_status & 0x10):
-            mpu.reset_FIFO()
-            # print("overflow!")
-        # Check if fifo data is ready
-        elif mpu_int_status & 0x02:
-            # Wait until packet_size number of bytes are ready for reading, default
-            # is 42 bytes
-            while FIFO_count < packet_size:
-                FIFO_count = mpu.get_FIFO_count()
-            FIFO_buffer = mpu.get_FIFO_bytes(packet_size)
-            quat = mpu.DMP_get_quaternion(FIFO_buffer)
+        # read a packet from FIFO
+        FIFO_buffer = mpu.get_FIFO_bytes(packet_size)
+        quat = mpu.DMP_get_quaternion(FIFO_buffer)
 
-            message = {
-                "quaternion": {
-                    "x": quat.y,  # switch x, y, z values around so that Y is up
-                    "y": quat.z,
-                    "z": quat.x,
-                    "w": quat.w,
-                },
-            }
-            pprint(message)
+        # send message
+        message = {
+            "quaternion": {
+                "x": quat.y,  # switch x, y, z values around so that Y is up
+                "y": quat.z,
+                "z": quat.x,
+                "w": quat.w,
+            },
+        }
+        # pprint(message)
 
-            await websocket.send(json.dumps(message))
+        await websocket.send(json.dumps(message))
 
 
 async def main():
