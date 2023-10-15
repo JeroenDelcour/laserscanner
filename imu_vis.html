@@ -27,7 +27,7 @@
       const controls = new THREE.OrbitControls(camera, renderer.domElement);
       document.body.append(renderer.domElement);
 
-      camera.position.z = 1.5;
+      camera.position.z = 0.25;
 
       const axesHelper = new THREE.AxesHelper(0.2);
       scene.add(axesHelper);
@@ -37,14 +37,14 @@
       const scannerGeometry = new THREE.ConeGeometry(0.05, 0.05, 4);
       const scannerMaterial = new THREE.MeshNormalMaterial();
       const scannerMesh = new THREE.Mesh(scannerGeometry, scannerMaterial);
+      // scannerMesh.rotateX(Math.PI);
       scannerMesh.rotateX(Math.PI);
-      scannerMesh.rotateX(Math.PI / 2);
       scannerMesh.rotateY(Math.PI / 4);
 
       scanner.add(scannerMesh);
       scene.add(scanner);
 
-      const ws = new WebSocket("ws://192.168.2.17:8765/");
+      const ws = new WebSocket("ws://192.168.2.18:8765/");
       ws.onmessage = function (event) {
         message = JSON.parse(event.data);
         console.log(message);
