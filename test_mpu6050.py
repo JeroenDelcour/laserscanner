@@ -48,6 +48,11 @@ async def sense(websocket):
         # read a packet from FIFO
         FIFO_buffer = mpu.get_FIFO_bytes(packet_size)
         quat = mpu.DMP_get_quaternion(FIFO_buffer)
+        acc_raw = mpu.DMP_get_acceleration_int16(FIFO_buffer)
+        quat_raw = mpu.DMP_get_quaternion_int16(FIFO_buffer)
+        grav = mpu.DMP_get_gravity(quat)
+        acceleration = mpu.DMP_get_linear_accel(acc_raw, grav)
+        print(acceleration.z / 8192)
 
         # send message
         message = {
@@ -56,6 +61,11 @@ async def sense(websocket):
                 "y": quat.z,
                 "z": quat.x,
                 "w": quat.w,
+            },
+            "acceleration": {
+                "x": acceleration.y / 8192,
+                "y": acceleration.z / 8192,
+                "z": acceleration.x / 8192,
             },
         }
         # pprint(message)
