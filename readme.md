@@ -10,6 +10,9 @@
 - [Hardware camera sync pulses](https://www.raspberrypi.org/forums/viewtopic.php?f=43&t=190314)
 - [Faster ArUco marker detection](http://andrewd.ces.clemson.edu/courses/cpsc482/papers/RMM18_speededAruco.pdf)
 
+### IMU
+- [The MPU6050 Explained](https://mjwhite8119.github.io/Robots/mpu6050)
+
 ### Occupancy grid
 - [Occupancy grid mapping from lidar data](https://www.coursera.org/lecture/motion-planning-self-driving-cars/lesson-2-populating-occupancy-grids-from-lidar-scan-data-part-2-VcH67)
 - [3D occupancy grid Python implementation](https://github.com/balzer82/3D-OccupancyGrid-Python)
