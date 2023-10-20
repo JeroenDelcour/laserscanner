@@ -59,14 +59,16 @@ class IMU:
         quat = Quaternion(w=quat.w, x=quat.x, y=quat.y, z=quat.z)
         acceleration = np.array([acceleration.x, acceleration.y, acceleration.z])
 
+        # scale acceleration to meters per second squared
+        acceleration /= 8192.0
+
         # transform from IMU to camera frame
-        quat = quat * Quaternion(axis=[0, 0, 1], degrees=180)
+        imu2cam = Quaternion(axis=[0, 0, 1], degrees=180)
+        acceleration = imu2cam.rotate(acceleration)
         # rotate 90 degrees around X axis so Y is up
-        quat = Quaternion(axis=[1, 0, 0], degrees=-90) * quat
-
-        # rotate acceleration vector from IMU frame to world frame
-        acceleration = quat.rotate(acceleration)
-
+        y_up = Quaternion(axis=[1, 0, 0], degrees=-90)
+        quat = y_up * quat * imu2cam
+        
         return quat, acceleration
 
 
@@ -122,6 +124,9 @@ async def sense(websocket):
     while True:
         imu_quat, imu_acceleration = imu.read()
         imu_quat = q_correction * imu_quat
+
+        # rotate acceleration vector from IMU frame to world frame
+        # imu_acceleration = imu_quat.rotate(imu_acceleration)
 
         image = picam2.capture_array("main")
 
@@ -180,6 +185,11 @@ async def sense(websocket):
                 "y": tvec[1, 0],
                 "z": tvec[2, 0],
             },
+            "acceleration": {
+                "x": imu_acceleration[0],
+                "y": imu_acceleration[1],
+                "z": imu_acceleration[2],
+            }
         }
 
         await websocket.send(json.dumps(message))
