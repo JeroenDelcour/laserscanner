@@ -40,9 +40,16 @@
       // scannerMesh.rotateX(Math.PI);
       scannerMesh.rotateX(Math.PI);
       scannerMesh.rotateY(Math.PI / 4);
-
       scanner.add(scannerMesh);
       scene.add(scanner);
+
+      const dir = new THREE.Vector3(0, 1, 0);
+      dir.normalize();
+      const origin = new THREE.Vector3(0, 0, 0);
+      const length = 1;
+      const hex = 0xffff00;
+      const arrowHelper = new THREE.ArrowHelper(dir, origin, length, hex);
+      scanner.add(arrowHelper);
 
       const ws = new WebSocket("ws://192.168.2.18:8765/");
       ws.onmessage = function (event) {
@@ -56,6 +63,15 @@
           message.quaternion.w
         );
         scanner.setRotationFromQuaternion(quaternion);
+
+        let acceleration = new THREE.Vector3(
+          message.acceleration.x,
+          message.acceleration.y,
+          message.acceleration.z
+        );
+        arrowHelper.setLength(acceleration.length());
+        acceleration.normalize();
+        arrowHelper.setDirection(acceleration);
       };
 
       function animate() {
