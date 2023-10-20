@@ -126,7 +126,7 @@ async def sense(websocket):
         imu_quat = q_correction * imu_quat
 
         # rotate acceleration vector from IMU frame to world frame
-        # imu_acceleration = imu_quat.rotate(imu_acceleration)
+        imu_acceleration = imu_quat.rotate(imu_acceleration)
 
         image = picam2.capture_array("main")
 
