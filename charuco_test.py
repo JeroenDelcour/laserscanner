@@ -16,12 +16,12 @@ class IMU:
         device_address = 0x68
         # The offsets are different for each device and should be changed
         # accordingly using a calibration procedure
-        x_accel_offset = -1874
-        y_accel_offset = 255
-        z_accel_offset = 1046
-        x_gyro_offset = 46
-        y_gyro_offset = 26
-        z_gyro_offset = -27
+        x_accel_offset = -2308
+        y_accel_offset = -1525
+        z_accel_offset = 2565
+        x_gyro_offset = 36
+        y_gyro_offset = 19
+        z_gyro_offset = -23
         self.mpu = MPU6050(
             i2c_bus,
             device_address,
@@ -61,6 +61,8 @@ class IMU:
 
         # rotate 90 degrees around X axis so Y is up
         dq = Quaternion(axis=[1, 0, 0], degrees=-90)
+        # rotate 90 degrees around Y due to the placement of the IMU relative to the camera
+        # dq = Quaternion(axis=[0, 1, 0], degrees=-90) * dq
         quat = dq * quat
 
         # rotate acceleration vector from IMU frame to world frame
@@ -106,53 +108,58 @@ async def sense(websocket):
 
     imu = IMU()
 
+    cam_quat = Quaternion()
+    tvec = np.zeros(shape=(3,1))
+
     while True:
         imu_quat, imu_acceleration = imu.read()
 
         image = picam2.capture_array("main")
 
         corners, ids, rejected = cv2.aruco.detectMarkers(image, dictionary=aruco_dict)
-        if len(corners) == 0:
-            continue
+        if len(corners) > 0:
 
-        retval, corners, ids = cv2.aruco.interpolateCornersCharuco(
-            corners, ids, image, charuco_board
-        )
-        success, rvec, tvec = cv2.aruco.estimatePoseCharucoBoard(
-            corners,
-            ids,
-            charuco_board,
-            camera_matrix,
-            distortion_coefficients,
-            rvec=None,
-            tvec=None,
-            useExtrinsicGuess=False,
-        )
-        if not success:
-            continue
-        
-        # tvec and quat of the board in the camera frame
-        angle = np.linalg.norm(rvec[:,0])
-        axis = rvec[:,0] / angle
-        quat = Quaternion(axis=axis, radians=angle)
+            retval, corners, ids = cv2.aruco.interpolateCornersCharuco(
+                corners, ids, image, charuco_board
+            )
+            success, rvec, new_tvec = cv2.aruco.estimatePoseCharucoBoard(
+                corners,
+                ids,
+                charuco_board,
+                camera_matrix,
+                distortion_coefficients,
+                rvec=None,
+                tvec=None,
+                useExtrinsicGuess=False,
+            )
+            if success:
+                # tvec and quat of the board in the camera frame
+                tvec = new_tvec
+                angle = np.linalg.norm(rvec[:,0])
+                axis = rvec[:,0] / angle
+                cam_quat = Quaternion(axis=axis, radians=angle)
 
-        # invert so we have the camera from the board's frame
-        quat = quat.inverse
-        tvec = -tvec
+                # invert so we have the camera from the board's frame
+                cam_quat = cam_quat.inverse
+                tvec = -tvec
 
-        # rotate 90 degrees around X axis so Y is up instead of Z
-        dq = Quaternion(axis=(1, 0, 0), degrees=-90)
-        quat = dq * quat
-        tvec[:,0] = quat.rotate(tvec[:,0])
-
-        print(Quaternion.absolute_distance(quat, imu_quat))
+                # rotate 90 degrees around X axis so Y is up instead of Z
+                dq = Quaternion(axis=(1, 0, 0), degrees=-90)
+                cam_quat = dq * cam_quat
+                tvec[:,0] = cam_quat.rotate(tvec[:,0])
 
         message = {
-            "quaternion": {
-                "x": quat.x,
-                "y": quat.y,
-                "z": quat.z,
-                "w": quat.w,
+            "cam_quaternion": {
+                "x": cam_quat.x,
+                "y": cam_quat.y,
+                "z": cam_quat.z,
+                "w": cam_quat.w,
+            },
+            "imu_quaternion": {
+                "x": imu_quat.x,
+                "y": imu_quat.y,
+                "z": imu_quat.z,
+                "w": imu_quat.w,
             },
             "translation": {
                 "x": tvec[0, 0],

@@ -65,7 +65,7 @@ async def sense(websocket):
 
         # send message
         message = {
-            "quaternion": {
+            "imu_quaternion": {
                 "x": quat.x,
                 "y": quat.y,
                 "z": quat.z,
