@@ -110,8 +110,18 @@ async def sense(websocket):
     cam_quat = Quaternion()
     tvec = np.zeros(shape=(3,1))
 
+    imu_correction = Quaternion()
+
+    ###
+    # x = x + v*dt + alpha*dk
+    # v = v + a*dt +  beta*dk
+    ###
+
+    q_correction = Quaternion()
+
     while True:
         imu_quat, imu_acceleration = imu.read()
+        imu_quat = q_correction * imu_quat
 
         image = picam2.capture_array("main")
 
@@ -147,10 +157,10 @@ async def sense(websocket):
                 cam_quat = dq * cam_quat
                 tvec[:,0] = cam_quat.rotate(tvec[:,0])
 
-                # yaw correction
-                # dq = cam_quat * imu_quat.inverse
-                # dq = Quaternion(axis=dq.axis, angle=0.9*dq.angle)
-                # imu_quat = dq * imu_quat
+                # orientation correction
+                alpha = 0.5
+                dq = cam_quat * imu_quat.inverse
+                q_correction = Quaternion(axis=dq.axis, angle=alpha * dq.angle) * q_correction
 
         message = {
             "cam_quaternion": {
