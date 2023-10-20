@@ -8,6 +8,67 @@ import numpy as np
 from pyquaternion import Quaternion
 from picamera2 import Picamera2
 
+from MPU6050 import MPU6050
+
+class IMU:
+    def __init__(self):
+        i2c_bus = 1
+        device_address = 0x68
+        # The offsets are different for each device and should be changed
+        # accordingly using a calibration procedure
+        x_accel_offset = -1874
+        y_accel_offset = 255
+        z_accel_offset = 1046
+        x_gyro_offset = 46
+        y_gyro_offset = 26
+        z_gyro_offset = -27
+        self.mpu = MPU6050(
+            i2c_bus,
+            device_address,
+            x_accel_offset,
+            y_accel_offset,
+            z_accel_offset,
+            x_gyro_offset,
+            y_gyro_offset,
+            z_gyro_offset,
+            0,
+        )
+
+        self.mpu.dmp_initialize()
+        self.mpu.set_DMP_enabled(True)
+        self.packet_size = self.mpu.DMP_get_FIFO_packet_size()
+
+    def read(self):
+        """
+        Reads quaternion and acceleration vector from the IMU.
+        """
+        self.mpu.reset_FIFO()
+
+        # wait for correct available data length, should be a VERY short wait
+        FIFO_count = self.mpu.get_FIFO_count()
+        while FIFO_count < self.packet_size:
+            FIFO_count = self.mpu.get_FIFO_count()
+
+        # read a packet from FIFO
+        FIFO_buffer = self.mpu.get_FIFO_bytes(self.packet_size)
+        quat = self.mpu.DMP_get_quaternion(FIFO_buffer)
+        acc_raw = self.mpu.DMP_get_acceleration_int16(FIFO_buffer)
+        quat_raw = self.mpu.DMP_get_quaternion_int16(FIFO_buffer)
+        grav = self.mpu.DMP_get_gravity(quat)
+        acceleration = self.mpu.DMP_get_linear_accel(acc_raw, grav)
+        quat = Quaternion(w=quat.w, x=quat.x, y=quat.y, z=quat.z)
+        acceleration = np.array([acceleration.x, acceleration.y, acceleration.z])
+
+        # rotate 90 degrees around X axis so Y is up
+        dq = Quaternion(axis=[1, 0, 0], degrees=-90)
+        quat = dq * quat
+
+        # rotate acceleration vector from IMU frame to world frame
+        acceleration = quat.rotate(acceleration)
+
+        return quat, acceleration
+
+
 async def sense(websocket):
     focal_length = 3.04e-3  # meters
     vertical_resolution = 800
@@ -41,10 +102,13 @@ async def sense(websocket):
     picam2.align_configuration(config)
     print(config["main"])
     picam2.configure(config)
-
     picam2.start()
 
+    imu = IMU()
+
     while True:
+        imu_quat, imu_acceleration = imu.read()
+
         image = picam2.capture_array("main")
 
         corners, ids, rejected = cv2.aruco.detectMarkers(image, dictionary=aruco_dict)
@@ -77,10 +141,11 @@ async def sense(websocket):
         tvec = -tvec
 
         # rotate 90 degrees around X axis so Y is up instead of Z
-        dq = Quaternion(axis=(1, 0, 0), degrees=90)
-        quat = dq.inverse * quat
-        tvec[:,0] = dq.rotate(tvec[:,0])
+        dq = Quaternion(axis=(1, 0, 0), degrees=-90)
+        quat = dq * quat
+        tvec[:,0] = quat.rotate(tvec[:,0])
 
+        print(Quaternion.absolute_distance(quat, imu_quat))
 
         message = {
             "quaternion": {
