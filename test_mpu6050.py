@@ -59,7 +59,9 @@ async def sense(websocket):
         # rotate 90 degrees around X axis so Y is up
         dq = Quaternion(axis=[1, 0, 0], degrees=-90)
         quat = dq * quat
-        # acceleration = dq.rotate(acceleration)
+
+        # rotate acceleration vector from IMU frame to world frame
+        acceleration = quat.rotate(acceleration)
 
         # send message
         message = {
