@@ -44,56 +44,72 @@
       scanner.position.x = 0.1;
       scanner.add(new THREE.AxesHelper(0.1))
 
-      const scanner_imu = scanner.clone();
-      scanner_imu.position.x = 0.2;
-      scene.add(scanner_imu);
-      scanner_imu.add(new THREE.AxesHelper(0.1))
+      const scanner_cam = scanner.clone();
+      scanner_cam.position.x = 0.2;
+      scene.add(scanner_cam);
+      scanner_cam.add(new THREE.AxesHelper(0.1))
 
       const dir = new THREE.Vector3(0, 1, 0);
       dir.normalize();
       const origin = new THREE.Vector3(0, 0, 0);
       const length = 1;
-      const hex = 0xffff00;
-      const arrowHelper = new THREE.ArrowHelper(dir, origin, length, hex);
-      scene.add(arrowHelper);
+      const hex = 0x0000ff;
+      const velocityArrow = new THREE.ArrowHelper(dir, origin, length, hex);
+      scene.add(velocityArrow);
+
+      accelerationArrow = velocityArrow.clone();
+      accelerationArrow.hex = 0xffff00;
+      scene.add(accelerationArrow);
 
       const ws = new WebSocket("ws://192.168.2.18:8765/");
       ws.onmessage = function (event) {
         message = JSON.parse(event.data);
         console.log(message);
 
+        quaternion = new THREE.Quaternion(
+          message.quaternion.x,
+          message.quaternion.y,
+          message.quaternion.z,
+          message.quaternion.w
+        );
         cam_quaternion = new THREE.Quaternion(
           message.cam_quaternion.x,
           message.cam_quaternion.y,
           message.cam_quaternion.z,
           message.cam_quaternion.w
         );
-        imu_quaternion = new THREE.Quaternion(
-          message.imu_quaternion.x,
-          message.imu_quaternion.y,
-          message.imu_quaternion.z,
-          message.imu_quaternion.w
+        scanner.setRotationFromQuaternion(quaternion);
+        scanner.position.x = message.position.x;
+        scanner.position.y = message.position.y;
+        scanner.position.z = message.position.z;
+        scanner_cam.setRotationFromQuaternion(cam_quaternion);
+        scanner_cam.position.x = message.position.x;
+        scanner_cam.position.y = message.position.y;
+        scanner_cam.position.z = message.position.z;
+
+        let velocity = new THREE.Vector3(
+          message.velocity.x,
+          message.velocity.y,
+          message.velocity.z
         );
-        scanner.setRotationFromQuaternion(cam_quaternion);
-        scanner.position.x = message.translation.x;
-        scanner.position.y = message.translation.y;
-        scanner.position.z = message.translation.z;
-        scanner_imu.setRotationFromQuaternion(imu_quaternion);
-        scanner_imu.position.x = message.translation.x;
-        scanner_imu.position.y = message.translation.y;
-        scanner_imu.position.z = message.translation.z;
+        velocityArrow.position.x = message.position.x;
+        velocityArrow.position.y = message.position.y;
+        velocityArrow.position.z = message.position.z;
+        velocityArrow.setLength(velocity.length());
+        velocity.normalize();
+        velocityArrow.setDirection(velocity);
 
         let acceleration = new THREE.Vector3(
           message.acceleration.x,
           message.acceleration.y,
           message.acceleration.z
         );
-        arrowHelper.position.x = message.translation.x;
-        arrowHelper.position.y = message.translation.y;
-        arrowHelper.position.z = message.translation.z;
-        arrowHelper.setLength(acceleration.length());
+        accelerationArrow.position.x = message.position.x;
+        accelerationArrow.position.y = message.position.y;
+        accelerationArrow.position.z = message.position.z;
+        accelerationArrow.setLength(acceleration.length());
         acceleration.normalize();
-        arrowHelper.setDirection(acceleration);
+        accelerationArrow.setDirection(acceleration);
       };
 
       function animate() {
