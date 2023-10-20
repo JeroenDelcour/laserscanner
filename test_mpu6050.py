@@ -3,8 +3,9 @@ import json
 import websockets
 from pprint import pprint
 
+from pyquaternion import Quaternion
 from MPU6050 import MPU6050
-from MPU6050.Quaternion import Quaternion
+from MPU6050.Quaternion import Quaternion as MPU6050Quaternion
 
 i2c_bus = 1
 device_address = 0x68
@@ -52,20 +53,26 @@ async def sense(websocket):
         quat_raw = mpu.DMP_get_quaternion_int16(FIFO_buffer)
         grav = mpu.DMP_get_gravity(quat)
         acceleration = mpu.DMP_get_linear_accel(acc_raw, grav)
-        print(acceleration.z / 8192)
+        quat = Quaternion(w=quat.w, x=quat.x, y=quat.y, z=quat.z)
+        acceleration = (acceleration.x, acceleration.y, acceleration.z)
+
+        # rotate 90 degrees around X axis so Y is up
+        dq = Quaternion(axis=[1, 0, 0], degrees=-90)
+        quat = dq * quat
+        # acceleration = dq.rotate(acceleration)
 
         # send message
         message = {
             "quaternion": {
-                "x": quat.y,  # switch x, y, z values around so that Y is up
-                "y": quat.z,
-                "z": quat.x,
+                "x": quat.x,
+                "y": quat.y,
+                "z": quat.z,
                 "w": quat.w,
             },
             "acceleration": {
-                "x": acceleration.y / 8192,
-                "y": acceleration.z / 8192,
-                "z": acceleration.x / 8192,
+                "x": acceleration[0] / 8192,
+                "y": acceleration[1] / 8192,
+                "z": acceleration[2] / 8192,
             },
         }
         # pprint(message)
@@ -75,7 +82,7 @@ async def sense(websocket):
 
 async def main():
     async with websockets.serve(sense, host=None, port=8765):
-        print("Server is started")
+        print("Server is ready")
         await asyncio.Future()
 
 
