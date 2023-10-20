@@ -49,7 +49,7 @@
       const length = 1;
       const hex = 0xffff00;
       const arrowHelper = new THREE.ArrowHelper(dir, origin, length, hex);
-      scanner.add(arrowHelper);
+      scene.add(arrowHelper);
 
       const ws = new WebSocket("ws://192.168.2.18:8765/");
       ws.onmessage = function (event) {
@@ -63,18 +63,19 @@
           message.quaternion.w
         );
         scanner.setRotationFromQuaternion(quaternion);
+
         scanner.position.x = message.translation.x;
         scanner.position.y = message.translation.y;
         scanner.position.z = message.translation.z;
 
-        // let acceleration = new THREE.Vector3(
-        //   message.acceleration.x,
-        //   message.acceleration.y,
-        //   message.acceleration.z
-        // );
-        // arrowHelper.setLength(acceleration.length());
-        // acceleration.normalize();
-        // arrowHelper.setDirection(acceleration);
+        let acceleration = new THREE.Vector3(
+          message.acceleration.x,
+          message.acceleration.y,
+          message.acceleration.z
+        );
+        arrowHelper.setLength(acceleration.length());
+        acceleration.normalize();
+        arrowHelper.setDirection(acceleration);
       };
 
       function animate() {
