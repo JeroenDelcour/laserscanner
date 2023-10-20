@@ -59,11 +59,10 @@ class IMU:
         quat = Quaternion(w=quat.w, x=quat.x, y=quat.y, z=quat.z)
         acceleration = np.array([acceleration.x, acceleration.y, acceleration.z])
 
+        # transform from IMU to camera frame
+        quat = quat * Quaternion(axis=[0, 0, 1], degrees=180)
         # rotate 90 degrees around X axis so Y is up
-        dq = Quaternion(axis=[1, 0, 0], degrees=-90)
-        # rotate 90 degrees around Y due to the placement of the IMU relative to the camera
-        # dq = Quaternion(axis=[0, 1, 0], degrees=-90) * dq
-        quat = dq * quat
+        quat = Quaternion(axis=[1, 0, 0], degrees=-90) * quat
 
         # rotate acceleration vector from IMU frame to world frame
         acceleration = quat.rotate(acceleration)
@@ -147,6 +146,11 @@ async def sense(websocket):
                 dq = Quaternion(axis=(1, 0, 0), degrees=-90)
                 cam_quat = dq * cam_quat
                 tvec[:,0] = cam_quat.rotate(tvec[:,0])
+
+                # yaw correction
+                # dq = cam_quat * imu_quat.inverse
+                # dq = Quaternion(axis=dq.axis, angle=0.9*dq.angle)
+                # imu_quat = dq * imu_quat
 
         message = {
             "cam_quaternion": {
