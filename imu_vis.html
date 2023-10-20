@@ -42,18 +42,21 @@
       scannerMesh.rotateY(Math.PI / 4);
       scanner.add(scannerMesh);
       scene.add(scanner);
+      scanner.position.x = 0.1;
+      scanner.add(new THREE.AxesHelper(0.1))
 
-      const dir = new THREE.Vector3(0, 0, 1);
-      dir.normalize();
-      const origin = new THREE.Vector3(0, 0, 0);
-      const length = 1;
-      const hex = 0xffff00;
-      const arrowHelper = new THREE.ArrowHelper(dir, origin, length, hex);
-      scene.add(arrowHelper);
+      // const dir = new THREE.Vector3(0, 1, 0);
+      // dir.normalize();
+      // const origin = new THREE.Vector3(0, 0, 0);
+      // const length = 0.1;
+      // const hex = 0xffff00;
+      // const arrowHelper = new THREE.ArrowHelper(dir, origin, length, hex);
+      // scanner.add(arrowHelper);
 
       const scanner_imu = scanner.clone();
-      scanner_imu.position.x = 0.3;
+      scanner_imu.position.x = 0.2;
       scene.add(scanner_imu);
+      scanner_imu.add(new THREE.AxesHelper(0.1))
 
       const ws = new WebSocket("ws://192.168.2.18:8765/");
       ws.onmessage = function (event) {
