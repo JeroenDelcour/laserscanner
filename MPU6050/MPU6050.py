@@ -758,6 +758,12 @@ class MPU6050:
         self.write_bit(C.MPU6050_RA_USER_CTRL,
                        C.MPU6050_USERCTRL_FIFO_RESET_BIT, True)
 
+    def reset_FIFO_fast(self):
+        """
+        Overwrites RA_USER_CTRL byte, possibly overwriting other settings.
+        """
+        self.__bus.write_byte_data(self.__dev_id, C.MPU6050_RA_USER_CTRL, 196)
+
     def get_FIFO_count(self):
         data = [0] * 2
         data = self.read_bytes(data, C.MPU6050_RA_FIFO_COUNTH, 2)
@@ -770,6 +776,9 @@ class MPU6050:
                 self.__bus.read_byte_data(self.__dev_id,
                                           C.MPU6050_RA_FIFO_R_W))
         return return_list
+
+    def read_FIFO_directly(self):
+        return self.__bus.read_byte_data(self.__dev_id, 0x74)
 
     def get_int_status(self):
         return self.__bus.read_byte_data(self.__dev_id,

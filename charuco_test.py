@@ -17,12 +17,12 @@ class IMU:
         device_address = 0x68
         # The offsets are different for each device and should be changed
         # accordingly using a calibration procedure
-        x_accel_offset = -2310
-        y_accel_offset = -1531
-        z_accel_offset = 2556
-        x_gyro_offset = 31
-        y_gyro_offset = 22
-        z_gyro_offset = -25
+        x_accel_offset = -2312
+        y_accel_offset = -1537
+        z_accel_offset = 2568
+        x_gyro_offset = 34
+        y_gyro_offset = 18
+        z_gyro_offset = -23
         self.mpu = MPU6050(
             i2c_bus,
             device_address,
@@ -34,7 +34,6 @@ class IMU:
             z_gyro_offset,
             0,
         )
-
         self.mpu.dmp_initialize()
         self.mpu.set_DMP_enabled(True)
         self.packet_size = self.mpu.DMP_get_FIFO_packet_size()
@@ -43,7 +42,7 @@ class IMU:
         """
         Reads quaternion and acceleration vector from the IMU.
         """
-        self.mpu.reset_FIFO()
+        self.mpu.reset_FIFO_fast()
 
         # wait for correct available data length, should be a VERY short wait
         FIFO_count = self.mpu.get_FIFO_count()
@@ -61,7 +60,8 @@ class IMU:
         acceleration = np.array([acceleration.x, acceleration.y, acceleration.z])
 
         # scale acceleration to meters per second squared
-        acceleration /= 8192.0
+        acceleration /= 8192.0  # between 0 and 1
+        acceleration *= 2 * 9.81 # in m/s
 
         # transform from IMU to camera frame
         imu2cam = Quaternion(axis=[0, 0, 1], degrees=180)
@@ -155,12 +155,13 @@ async def sense(websocket):
     # state
     position = np.zeros(3)
     velocity = np.zeros(3)
+    accel = np.zeros(3)
     quat = Quaternion()
     quat_correction = Quaternion()
     quat_cam = Quaternion()
     position_cam = np.zeros(3)
-    t_prev = time.time()
 
+    t_prev = time.time()
     while True:
         # update quaternion with IMU readings
         quat, acceleration = imu.read()
@@ -170,10 +171,9 @@ async def sense(websocket):
         now = time.time()
         dt = now - t_prev
         t_prev = now
-        print(f"dt: {dt}")
+        print(f"update rate: {1 / dt}")
 
         # update velocity and position with IMU readings
-        acceleration = quat.rotate(acceleration)  # rotate acceleration vector from IMU frame to world frame
         velocity += acceleration * dt
         position += velocity * dt
 
@@ -203,7 +203,7 @@ async def sense(websocket):
                 "z": quat.z,
                 "w": quat.w,
             },
-            "cam_quaternion": {
+            "quaternion_cam": {
                 "x": quat_cam.x,
                 "y": quat_cam.y,
                 "z": quat_cam.z,
@@ -225,7 +225,7 @@ async def sense(websocket):
                 "z": acceleration[2],
             }
         }
-        pprint(message)
+        # pprint(message)
 
         await websocket.send(json.dumps(message))
 

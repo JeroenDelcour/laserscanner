@@ -39,7 +39,7 @@ async def sense(websocket):
     while True:
         # Clear the buffer so as we can get fresh values
         # The sensor is running a lot faster than our sample period
-        mpu.reset_FIFO()
+        mpu.reset_FIFO_fast()
 
         # wait for correct available data length, should be a VERY short wait
         FIFO_count = mpu.get_FIFO_count()
