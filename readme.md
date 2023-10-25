@@ -22,3 +22,6 @@
 - [Using laser plane for depth calculation and calibrating laser plane](https://eejournal.ktu.lt/index.php/elt/article/download/13765/7289)
 - [Calibrating laser plan](https://answers.opencv.org/question/67008/can-i-get-2d-world-coordinates-from-a-single-image-uv-coords/)
 - [Converting a 2D image point to a 3D world point](https://stackoverflow.com/questions/14514357/converting-a-2d-image-point-to-a-3d-world-point)
+### Laser line detection
+
+- [Laser stripe detection neural network](https://github.com/zhaocongyang/LSDNN)
