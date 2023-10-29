@@ -1,6 +1,6 @@
 numpy==1.26.0
 opencv-contrib-python==4.8.1.78
 ujson==5.8.0
-mpu6050-raspberrypi==1.2
 websockets==11.0.3
 pyquaternion==0.9.9
+adafruit-circuitpython-bno08x==1.2.4

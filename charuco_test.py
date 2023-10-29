@@ -9,68 +9,13 @@ from pyquaternion import Quaternion
 from picamera2 import Picamera2
 import numpy as np
 
-from MPU6050 import MPU6050
-
-class IMU:
-    def __init__(self):
-        i2c_bus = 1
-        device_address = 0x68
-        # The offsets are different for each device and should be changed
-        # accordingly using a calibration procedure
-        x_accel_offset = -2312
-        y_accel_offset = -1537
-        z_accel_offset = 2568
-        x_gyro_offset = 34
-        y_gyro_offset = 18
-        z_gyro_offset = -23
-        self.mpu = MPU6050(
-            i2c_bus,
-            device_address,
-            x_accel_offset,
-            y_accel_offset,
-            z_accel_offset,
-            x_gyro_offset,
-            y_gyro_offset,
-            z_gyro_offset,
-            0,
-        )
-        self.mpu.dmp_initialize()
-        self.mpu.set_DMP_enabled(True)
-        self.packet_size = self.mpu.DMP_get_FIFO_packet_size()
-
-    def read(self):
-        """
-        Reads quaternion and acceleration vector from the IMU.
-        """
-        self.mpu.reset_FIFO_fast()
-
-        # wait for correct available data length, should be a VERY short wait
-        FIFO_count = self.mpu.get_FIFO_count()
-        while FIFO_count < self.packet_size:
-            FIFO_count = self.mpu.get_FIFO_count()
-
-        # read a packet from FIFO
-        FIFO_buffer = self.mpu.get_FIFO_bytes(self.packet_size)
-        quat = self.mpu.DMP_get_quaternion(FIFO_buffer)
-        acc_raw = self.mpu.DMP_get_acceleration_int16(FIFO_buffer)
-        quat_raw = self.mpu.DMP_get_quaternion_int16(FIFO_buffer)
-        grav = self.mpu.DMP_get_gravity(quat)
-        acceleration = self.mpu.DMP_get_linear_accel(acc_raw, grav)
-        quat = Quaternion(w=quat.w, x=quat.x, y=quat.y, z=quat.z)
-        acceleration = np.array([acceleration.x, acceleration.y, acceleration.z])
-
-        # scale acceleration to meters per second squared
-        acceleration /= 8192.0  # between 0 and 1
-        acceleration *= 2 * 9.81 # in m/s
-
-        # transform from IMU to camera frame
-        imu2cam = Quaternion(axis=[0, 0, 1], degrees=180)
-        acceleration = imu2cam.rotate(acceleration)
-        # rotate 90 degrees around X axis so Y is up
-        y_up = Quaternion(axis=[1, 0, 0], degrees=-90)
-        quat = y_up * quat * imu2cam
-        
-        return quat, acceleration
+import board
+import busio
+from adafruit_bno08x import (
+    BNO_REPORT_LINEAR_ACCELERATION,
+    BNO_REPORT_GAME_ROTATION_VECTOR,
+)
+from adafruit_bno08x.i2c import BNO08X_I2C
 
 class Camera:
     def __init__(self):
@@ -140,6 +85,31 @@ class Camera:
         return False, None, None
 
 
+class IMU:
+    def __init__(self):
+        i2c = busio.I2C(board.SCL, board.SDA, frequency=400000)
+        self.bno = BNO08X_I2C(i2c)
+
+        self.bno.enable_feature(BNO_REPORT_LINEAR_ACCELERATION)
+        self.bno.enable_feature(BNO_REPORT_GAME_ROTATION_VECTOR)
+
+    def read(self):
+        x, y, z, w = self.bno.game_quaternion
+        quat = Quaternion(w, x, y, z)
+        acceleration = np.array(self.bno.linear_acceleration)
+
+        # transform from IMU to camera frame
+        imu2cam = Quaternion(axis=[1, 0, 0], degrees=180)
+        acceleration = imu2cam.rotate(acceleration)
+        # rotate 90 degrees around X axis so Y is up
+        y_up = Quaternion(axis=[1, 0, 0], degrees=-90)
+        quat = y_up * quat * imu2cam
+        # acceleration = imu2cam.rotate(acceleration)
+        acceleration = quat.rotate(acceleration)
+
+        return quat, acceleration
+
+
 async def sense(websocket):
     # initialize PiCamera
     picam2 = Picamera2()
@@ -149,8 +119,8 @@ async def sense(websocket):
     picam2.configure(config)
     picam2.start()
 
-    camera = Camera()
     imu = IMU()
+    camera = Camera()
 
     # state
     position = np.zeros(3)
@@ -165,13 +135,16 @@ async def sense(websocket):
     while True:
         # update quaternion with IMU readings
         quat, acceleration = imu.read()
-        quat = quat_correction * quat
 
         # update timestep
         now = time.time()
         dt = now - t_prev
+        # dt = 1/200
         t_prev = now
         print(f"update rate: {1 / dt}")
+
+        # braking force
+        acceleration += 1 * -velocity
 
         # update velocity and position with IMU readings
         velocity += acceleration * dt
@@ -186,12 +159,16 @@ async def sense(websocket):
 
             # orientation correction
             gamma = 0.5
-            dq = quat_cam * quat.inverse
+            if quat.norm == 0:
+                quat_inverse = Quaternion()
+            else:
+                quat_inverse = quat.inverse
+            dq = quat_cam * quat_inverse
             quat_correction = Quaternion(axis=dq.axis, angle=gamma * dq.angle) * quat_correction
 
             # position and velocity correction
-            alpha = 0.2
-            beta = 0.2
+            alpha = 0.5
+            beta = 0.5
             correction = position_cam - position
             velocity += beta * correction
             position += alpha * correction
