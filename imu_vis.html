@@ -72,17 +72,17 @@
           message.quaternion.z,
           message.quaternion.w
         );
-        cam_quaternion = new THREE.Quaternion(
-          message.cam_quaternion.x,
-          message.cam_quaternion.y,
-          message.cam_quaternion.z,
-          message.cam_quaternion.w
+        quaternion_cam = new THREE.Quaternion(
+          message.quaternion_cam.x,
+          message.quaternion_cam.y,
+          message.quaternion_cam.z,
+          message.quaternion_cam.w
         );
         scanner.setRotationFromQuaternion(quaternion);
         scanner.position.x = message.position.x;
         scanner.position.y = message.position.y;
         scanner.position.z = message.position.z;
-        scanner_cam.setRotationFromQuaternion(cam_quaternion);
+        scanner_cam.setRotationFromQuaternion(quaternion_cam);
         scanner_cam.position.x = message.position.x;
         scanner_cam.position.y = message.position.y;
         scanner_cam.position.z = message.position.z;
@@ -107,7 +107,7 @@
         accelerationArrow.position.x = message.position.x;
         accelerationArrow.position.y = message.position.y;
         accelerationArrow.position.z = message.position.z;
-        accelerationArrow.setLength(acceleration.length());
+        accelerationArrow.setLength(acceleration.length() * 0.5);
         acceleration.normalize();
         accelerationArrow.setDirection(acceleration);
       };
