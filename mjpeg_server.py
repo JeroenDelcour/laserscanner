@@ -1,47 +1,42 @@
+#!/usr/bin/python3
+
+# Mostly copied from https://picamera.readthedocs.io/en/release-1.13/recipes2.html
+# Run this script, then point a web browser at http:<this-ip-address>:8000
+# Note: needs simplejpeg to be installed (pip3 install simplejpeg).
+
 import io
-import picamera
 import logging
 import socketserver
-from threading import Condition
 from http import server
-import gpiozero
-from time import sleep
+from threading import Condition
 
-PAGE="""\
+from picamera2 import Picamera2
+from picamera2.encoders import JpegEncoder
+from picamera2.outputs import FileOutput
+
+PAGE = f"""\
 <html>
 <head>
-<title>picamera MJPEG streaming demo</title>
+<title>picamera2 MJPEG streaming demo</title>
 </head>
 <body>
-<h1>PiCamera MJPEG Streaming Demo</h1>
-<img src="stream.mjpg" width="1640" height="1232" />
+<h1>Picamera2 MJPEG Streaming Demo</h1>
+<img src="stream.mjpg" width="1536" height="864" />
 </body>
 </html>
 """
 
-class StreamingOutput(object):
-    def __init__(self, camera):
-        self.camera = camera
+
+class StreamingOutput(io.BufferedIOBase):
+    def __init__(self):
         self.frame = None
-        self.buffer = io.BytesIO()
         self.condition = Condition()
-        # self._longshutter = True
 
     def write(self, buf):
-        # if self._longshutter:
-        #     self.camera.shutter_speed = 1000
-        # else:
-        #     self.camera.shutter_speed = 20
-        # self._longshutter = not self._longshutter
-        if buf.startswith(b'\xff\xd8'):
-            # New frame, copy the existing buffer's content and notify all
-            # clients it's available
-            self.buffer.truncate()
-            with self.condition:
-                self.frame = self.buffer.getvalue()
-                self.condition.notify_all()
-            self.buffer.seek(0)
-        return self.buffer.write(buf)
+        with self.condition:
+            self.frame = buf
+            self.condition.notify_all()
+
 
 class StreamingHandler(server.BaseHTTPRequestHandler):
     def do_GET(self):
@@ -82,24 +77,23 @@ class StreamingHandler(server.BaseHTTPRequestHandler):
             self.send_error(404)
             self.end_headers()
 
+
 class StreamingServer(socketserver.ThreadingMixIn, server.HTTPServer):
     allow_reuse_address = True
     daemon_threads = True
 
-laser = gpiozero.LED(17)
-laser.on()
 
-with picamera.PiCamera(resolution='1640x1232', framerate=15) as camera:
-    camera.shutter_speed = 200
-    camera.iso = 800
-    # sleep(2)  # let automatic gain settle
-    # camera.exposure_mode = "off"
-    output = StreamingOutput(camera)
-    camera.start_recording(output, format='mjpeg')
-    try:
-        address = ('', 8000)
-        server = StreamingServer(address, StreamingHandler)
-        server.serve_forever()
-    finally:
-        laser.off()
-        camera.stop_recording()
+picam2 = Picamera2()
+config = picam2.create_video_configuration(main={"size": (1536, 864)})
+picam2.align_configuration(config)
+print(config["main"])
+picam2.configure(config)
+output = StreamingOutput()
+picam2.start_recording(JpegEncoder(), FileOutput(output))
+
+try:
+    address = ('', 8000)
+    server = StreamingServer(address, StreamingHandler)
+    server.serve_forever()
+finally:
+    picam2.stop_recording()
