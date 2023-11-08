@@ -19,27 +19,12 @@ from adafruit_bno08x.i2c import BNO08X_I2C
 
 class Camera:
     def __init__(self):
-        focal_length = 3.04e-3  # meters
-        vertical_resolution = 800
-        horizontal_resolution = 600
-        fx = fy = 1355 / 2
-        cx, cy = 0.5 * horizontal_resolution, 0.5 * vertical_resolution
-        self.camera_matrix = np.array([[fx, 0, cx], [0, fy, cy], [0, 0, 1]], dtype=np.float32)
-        self.distortion_coefficients = np.array(
-            [
-                0.22128342058032355,
-                -0.5663376863990286,
-                -0.0001804474513748153,
-                -0.001201953225667692,
-                0.2602535953452802,
-            ],
-            dtype=np.float32,
-        )
-
+        self.camera_matrix = np.loadtxt("calibration/picamV3wide_1920x1080_camera_matrix.txt")
+        self.distortion_coefficients = np.loadtxt("calibration/picamV3wide_1920x1080_dist_coeffs.txt")
 
         self.aruco_dict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_100)
         self.charuco_board = cv2.aruco.CharucoBoard_create(
-            squaresX=5, squaresY=7, squareLength=0.015, markerLength=0.011, dictionary=self.aruco_dict
+            squaresX=5, squaresY=7, squareLength=0.036, markerLength=0.027, dictionary=self.aruco_dict
         )
 
         self.tvec = None
@@ -113,7 +98,7 @@ class IMU:
 async def sense(websocket):
     # initialize PiCamera
     picam2 = Picamera2()
-    config = picam2.create_video_configuration(main={"size": (800, 600), "format": "BGR888"})
+    config = picam2.create_video_configuration(main={"size": (1920, 1080), "format": "BGR888"})
     picam2.align_configuration(config)
     print(config["main"])
     picam2.configure(config)
