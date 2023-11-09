@@ -6,7 +6,10 @@ from picamera2.encoders import H264Encoder, JpegEncoder
 from picamera2.outputs import FileOutput
 
 picam2 = Picamera2()
-video_config = picam2.create_video_configuration({"size": (1920, 1080)})
+video_config = picam2.create_video_configuration(
+        {"size": (960, 540)},
+        raw=picam2.sensor_modes[1]  # force full frame sensor mode, no cropping
+)
 picam2.configure(video_config)
 encoder = H264Encoder(1000000)
 # encoder = JpegEncoder()
