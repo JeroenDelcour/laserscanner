@@ -14,12 +14,12 @@ from hourglassnet import HourglassNet
 
 torch.manual_seed(0)
 
-input_size = (384, 512)
-output_size = (96, 128)
+input_size = (192, 2048)
+output_size = (48, 512)
 batch_size = 4
-epochs = 200
+epochs = 400
 num_workers = 4
-from_checkpoint = "checkpoints/2023-11-10T17:31:26.165278.pt"
+from_checkpoint = None  # "checkpoints/2023-11-10T17:31:26.165278.pt"
 
 data_transforms = v2.Compose(
     [
