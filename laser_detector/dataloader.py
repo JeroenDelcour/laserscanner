@@ -2,10 +2,12 @@ import json
 from pathlib import Path
 from typing import Optional, Tuple
 
+import torch
 import numpy as np
 from matplotlib import pyplot as plt
 from PIL import Image, ImageOps
 from torch.utils.data import Dataset
+from torchvision import tv_tensors
 
 
 class SuperviselyLaserLineDataset(Dataset):
@@ -90,18 +92,21 @@ class SuperviselyLaserLineDataset(Dataset):
                 segment_dst = 0.5 * (dx**2 + dy**2)
                 dst = np.minimum(dst, segment_dst)
         target = np.exp(-((dst) ** 2 / (2 * self.sigma**2)))  # gaussian generation
+        # target = tv_tensors.Mask(target)
+        target = torch.Tensor(target)
         return target
 
     def __getitem__(self, index):
         image = Image.open(self._image_paths[index])
         image = ImageOps.exif_transpose(image)
+        image = tv_tensors.Image(image)
         target = self._load_ann(self._ann_paths[index])
         if self.transforms is not None:
             image, target = self.transforms(image, target)
         return image, target
 
     def __len__(self):
-        raise NotImplementedError
+        return len(self._image_paths)
 
 
 if __name__ == "__main__":
