@@ -99,6 +99,7 @@ class SuperviselyLaserLineDataset(Dataset):
     def __getitem__(self, index):
         image = Image.open(self._image_paths[index])
         image = ImageOps.exif_transpose(image)
+        image = image.convert("RGB")
         image = tv_tensors.Image(image)
         target = self._load_ann(self._ann_paths[index])
         if self.transforms is not None:

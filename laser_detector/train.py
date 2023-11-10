@@ -14,11 +14,12 @@ from hourglassnet import HourglassNet
 
 torch.manual_seed(0)
 
-input_size = (512, 512)
-output_size = (128, 128)
+input_size = (384, 512)
+output_size = (96, 128)
 batch_size = 4
-epochs = 600
+epochs = 200
 num_workers = 4
+from_checkpoint = "checkpoints/2023-11-10T17:31:26.165278.pt"
 
 data_transforms = v2.Compose(
     [
@@ -56,14 +57,18 @@ def criterion(outputs, targets):
     """
     Calculate MSE loss for each hourglass stack and return the sum.
     """
-    loss = nn.functional.mse_loss(outputs[0], targets)
-    for output in outputs[1:]:
-        loss += nn.functional.mse_loss(output, targets)
+    n_stacks = outputs.size()[1]
+    loss = sum(
+        (nn.functional.mse_loss(outputs[:, i, 0], targets) for i in range(n_stacks))
+    )
     return loss
 
 
-model = HourglassNet(nstack=2, inp_dim=256, oup_dim=1)
+model = HourglassNet(nstack=1, inp_dim=256, oup_dim=1)
 model.to(device)
+
+if from_checkpoint:
+    model.load_state_dict(torch.load(from_checkpoint, map_location=device))
 
 optimizer = Adam(model.parameters(), lr=1e-4)
 
