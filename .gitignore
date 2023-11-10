@@ -1,10 +1,10 @@
-data
 *.h264 
 *.mp4
+*.mkv
 *.pdf
 *.png
+*.py.lprof
 .vscode
-scratchpad.py
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
