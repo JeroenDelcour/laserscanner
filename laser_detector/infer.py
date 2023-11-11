@@ -64,6 +64,7 @@ def main(checkpoint, video, threshold=0.9, cutoff=0.01):
             outputs = model(model_input)
         heatmap = outputs[0, -1, 0].cpu().numpy().astype(float)
 
+        # Visualize points
         heatmap[heatmap < cutoff] = 1e-12
         # mask = heatmap.max(axis=0) > threshold
         y_coords = np.average(y_grid, axis=0, weights=heatmap)
@@ -72,7 +73,6 @@ def main(checkpoint, video, threshold=0.9, cutoff=0.01):
         x_coords = x_range[mask].astype(float)
         y_coords *= y_scale
         x_coords *= x_scale
-
         vis = frame
         for x, y in zip(x_coords, y_coords):
             vis = cv2.circle(
@@ -84,8 +84,7 @@ def main(checkpoint, video, threshold=0.9, cutoff=0.01):
             )
 
         # # Visualize heatmap
-        # vis = heatmap.cpu().numpy()
-        # vis = np.clip(vis, 0, 1)
+        # vis = np.clip(heatmap, 0, 1)
         # vis *= 255
         # vis = vis.astype(np.uint8)
         # height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))

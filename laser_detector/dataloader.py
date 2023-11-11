@@ -66,6 +66,7 @@ class SuperviselyLaserLineDataset(Dataset):
             x_scale = 1
             y_scale = 1
         dst[:] = np.Infinity
+        y_range = np.arange(self.target_shape[0])
         for obj in ann["objects"]:
             if not obj["geometryType"] == "line":
                 continue
@@ -74,23 +75,35 @@ class SuperviselyLaserLineDataset(Dataset):
             )
             # calculate distance for each pixel to the nearest line segment
             for (x0, y0), (x1, y1) in line_segments:
+                # ensure X values are always increasing
+                if x0 > x1:
+                    x0, y0, x1, y1 = x1, y1, x0, y0
+
                 x0 = x0 * x_scale
                 y0 = y0 * y_scale
                 x1 = x1 * x_scale
                 y1 = y1 * y_scale
-                if x0 > x1:
-                    x0, y0, x1, y1 = x1, y1, x0, y0
-                px = x1 - x0
-                py = y1 - y0
-                norm = px**2 + py**2
-                u = ((mesh_x - x0) * px + (mesh_y - y0) * py) / norm
-                u = np.clip(u, 0, 1)
-                x = x0 + u * px
-                y = y0 + u * py
-                dx = x - mesh_x
-                dy = y - mesh_y
-                segment_dst = 0.5 * (dx**2 + dy**2)
-                dst = np.minimum(dst, segment_dst)
+
+                x0 = round(x0)
+                x1 = round(x1)
+                line_y_points = np.linspace(y0, y1, num=x1 - x0)
+                dy = abs(
+                    np.repeat(y_range[:, np.newaxis], x1 - x0, axis=1) - line_y_points
+                )
+                dst[:, x0:x1] = np.minimum(dst[:, x0:x1], dy)
+
+                # px = x1 - x0
+                # py = y1 - y0
+                # norm = px**2 + py**2
+                # u = ((mesh_x - x0) * px + (mesh_y - y0) * py) / norm
+                # u = np.clip(u, 0, 1)
+                # x = x0 + u * px
+                # y = y0 + u * py
+                # dx = x - mesh_x
+                # dy = y - mesh_y
+                # segment_dst = 0.5 * (dx**2 + dy**2)
+                # dst = np.minimum(dst, segment_dst)
+
         target = np.exp(-((dst) ** 2 / (2 * self.sigma**2)))  # gaussian generation
         # target = tv_tensors.Mask(target)
         target = torch.Tensor(target)
@@ -115,7 +128,8 @@ if __name__ == "__main__":
     dataset = SuperviselyLaserLineDataset(
         "data/272599_Laser line detection", target_shape=(180, 320)
     )
-    image, target = dataset[0]
+    image, target = dataset[-1]
+    # target = target.numpy()
     fig, ax = plt.subplots(nrows=2)
     ax[0].imshow(image)
     ax[1].imshow(target)
