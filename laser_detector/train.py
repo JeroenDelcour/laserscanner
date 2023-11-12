@@ -14,9 +14,9 @@ from hourglassnet import HourglassNet
 
 torch.manual_seed(0)
 
-input_size = (192, 2048)
-output_size = (48, 512)
-batch_size = 6
+input_size = (192, 1024)
+output_size = (48, 256)
+batch_size = 16
 epochs = 400
 num_workers = 4
 from_checkpoint = None
@@ -64,13 +64,13 @@ def criterion(outputs, targets):
     return loss
 
 
-model = HourglassNet(nstack=1, inp_dim=256, oup_dim=1)
+model = HourglassNet(nstack=3, inp_dim=32, oup_dim=1)
 model.to(device)
 
 if from_checkpoint:
     model.load_state_dict(torch.load(from_checkpoint, map_location=device))
 
-optimizer = Adam(model.parameters(), lr=1e-4)
+optimizer = Adam(model.parameters(), lr=1e-3)
 
 losses = []
 

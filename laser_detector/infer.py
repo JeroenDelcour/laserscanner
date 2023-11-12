@@ -15,13 +15,14 @@ def parse_args():
     return parser.parse_args()
 
 
-def main(checkpoint, video, threshold=0.9, cutoff=0.01):
+def main(checkpoint, video, threshold=0.5, cutoff=0.01):
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    # device = torch.device("cpu")
 
-    input_size = (192, 2048)
-    output_size = (48, 512)
+    input_size = (192, 1024)
+    output_size = (48, 256)
 
-    model = HourglassNet(nstack=1, inp_dim=256, oup_dim=1)
+    model = HourglassNet(nstack=3, inp_dim=32, oup_dim=1)
     model.to(device)
     model.load_state_dict(torch.load(checkpoint, map_location=device))
     model.eval()
@@ -38,6 +39,7 @@ def main(checkpoint, video, threshold=0.9, cutoff=0.01):
         cv2.VideoWriter_fourcc(*"MJPG"),
         fps=int(cap.get(cv2.CAP_PROP_FPS)),
         frameSize=(width, height),
+        # frameSize=(2 * width, height),
     )
 
     y_scale = height / output_size[0]
@@ -46,6 +48,7 @@ def main(checkpoint, video, threshold=0.9, cutoff=0.01):
         np.arange(output_size[0])[:, np.newaxis], repeats=output_size[1], axis=1
     )
     x_range = np.arange(output_size[1])
+    # y_grid = torch.Tensor(y_grid).to(device)
 
     pbar = tqdm()
     while cap.isOpened():
@@ -53,7 +56,9 @@ def main(checkpoint, video, threshold=0.9, cutoff=0.01):
         if not success:
             break
 
-        model_input = cv2.resize(frame, dsize=input_size[::-1])
+        model_input = frame
+        model_input = model_input[:, 480:-480]  # crop
+        model_input = cv2.resize(model_input, dsize=input_size[::-1])
         model_input = np.moveaxis(model_input, 2, 0)  # HWC to CHW
         model_input = model_input[np.newaxis, :]  # batch dimension
         model_input = model_input.astype(np.float32) / 255
@@ -68,11 +73,15 @@ def main(checkpoint, video, threshold=0.9, cutoff=0.01):
         heatmap[heatmap < cutoff] = 1e-12
         # mask = heatmap.max(axis=0) > threshold
         y_coords = np.average(y_grid, axis=0, weights=heatmap)
+        # y_coords = (y_grid * heatmap).sum(dim=0) / y_grid.sum(dim=0)
+        # y_coords = y_coords.cpu().numpy()
+        # mask = y_coords != 0.5 * output_size[0]
         mask = heatmap[y_coords.round().astype(int), x_range] > threshold
         y_coords = y_coords[mask]
         x_coords = x_range[mask].astype(float)
         y_coords *= y_scale
         x_coords *= x_scale
+        x_coords = x_coords * 0.5 + 480
         vis = frame
         for x, y in zip(x_coords, y_coords):
             vis = cv2.circle(
@@ -84,6 +93,7 @@ def main(checkpoint, video, threshold=0.9, cutoff=0.01):
             )
 
         # # Visualize heatmap
+        # # make sure to set writer output width to `2 * width`
         # vis = np.clip(heatmap, 0, 1)
         # vis *= 255
         # vis = vis.astype(np.uint8)
@@ -97,7 +107,7 @@ def main(checkpoint, video, threshold=0.9, cutoff=0.01):
         if cv2.waitKey(1) == ord("q"):
             break
 
-        writer.write(frame)
+        writer.write(vis)
 
         pbar.update()
 
