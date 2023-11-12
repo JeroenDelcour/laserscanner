@@ -25,3 +25,8 @@
 ### Laser line detection
 
 - [Laser stripe detection neural network](https://github.com/zhaocongyang/LSDNN)
+
+
+## CAD model
+
+[Link to OnShape document.](https://cad.onshape.com/documents/1423cf91f913fb11629c00ea/w/df5cc41340bfbc810fae1e47/e/ec2b34329b9183ffbfbdde41?renderMode=0&uiState=6550f2139bf28a3b35183667)
